@@ -255,7 +255,7 @@ def train(model, train_loader, val_loader, criterion, optimizer, epochs, device)
         early_stopping(val_loss, model)
         if early_stopping.early_stop:
             print("Early stopping triggered. Loading the best model...")
-            model.load_state_dict(torch.load("best_model.pth"))
+            model.load_state_dict(torch.load(checkpoint_path))
             break
 
 
