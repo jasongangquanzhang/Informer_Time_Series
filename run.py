@@ -2,6 +2,8 @@
 import os
 import torch
 import numpy as np
+import torch.nn as nn
+import torch.optim as optim
 import random
 from torch.utils.data import DataLoader, Dataset
 from models.model import (
@@ -14,6 +16,7 @@ import csv
 import sys
 from pmdarima import auto_arima
 from filelock import Timeout, FileLock
+from copy import deepcopy
 
 
 # Set up random seed
@@ -258,6 +261,78 @@ def train(model, train_loader, val_loader, criterion, optimizer, epochs, device)
             model.load_state_dict(torch.load(checkpoint_path))
             break
 
+###### Define RNN Module ######
+class RNN(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size, num_layers):
+        super(RNN, self).__init__()
+        self.rnn = nn.RNN(input_size, hidden_size, num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        out, _ = self.rnn(x)
+        out = self.fc(out[:, -1, :])
+        return out
+
+def train_rnn_model(model, train_loader, val_loader, criterion, optimizer, device, epochs=10):
+    best_val_loss = float("inf")
+    best_model_state = None
+
+    for epoch in range(epochs):
+        model.train()
+        train_loss = 0
+        for x, y in train_loader:
+            x, y = x.to(device), y.to(device)
+            optimizer.zero_grad()
+            output = model(x)
+            loss = criterion(output, y)
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item()
+        train_loss /= len(train_loader)
+
+        model.eval()
+        val_loss = 0
+        with torch.no_grad():
+            for x, y in val_loader:
+                x, y = x.to(device), y.to(device)
+                output = model(x)
+                loss = criterion(output, y)
+                val_loss += loss.item()
+        val_loss /= len(val_loader)
+
+        print(f"Epoch [{epoch+1}/{epochs}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
+
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            best_model_state = deepcopy(model.state_dict())
+
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state)
+    return model
+
+def rnn_forecast(model, test_loader, device):
+    model.eval()
+    predictions = []
+    with torch.no_grad():
+        for x, _ in test_loader:
+            x = x.to(device)
+            output = model(x)
+            predictions.append(output.squeeze(-1).cpu().numpy())
+    return np.concatenate(predictions)
+
+###### Custom Dataset ######
+class RNNDataset(Dataset):
+    def __init__(self, data, seq_len):
+        self.data = data
+        self.seq_len = seq_len
+
+    def __len__(self):
+        return len(self.data) - self.seq_len
+
+    def __getitem__(self, idx):
+        x = self.data[idx:idx + self.seq_len]
+        y = self.data[idx + self.seq_len]
+        return torch.tensor(x, dtype=torch.float32).unsqueeze(-1), torch.tensor(y, dtype=torch.float32)
 
 
 # Main function
@@ -278,14 +353,14 @@ def main():
     ###### Informer Module ######
     train_len = data_length - target_len
     train_split = int(train_len * 0.8)
-    train_data_split = data[:train_split]
-    val_data_split = data[train_split:train_len]
+    train_data = data[:train_split]
+    val_data = data[train_split:train_len]
     test_data = data[train_len - seq_len :]
     # Split training data into train and validation sets
 
     # Prepare datasets and loaders
-    train_dataset = TimeSeriesDataset(train_data_split, seq_len, label_len, pred_len)
-    val_dataset = TimeSeriesDataset(val_data_split, seq_len, label_len, pred_len)
+    train_dataset = TimeSeriesDataset(train_data, seq_len, label_len, pred_len)
+    val_dataset = TimeSeriesDataset(val_data, seq_len, label_len, pred_len)
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
@@ -326,6 +401,24 @@ def main():
         model, test_data, seq_len, label_len, pred_len, target_len, device
     )
     result["Informer"] = informer_predictions
+    
+    ###### RNN Module ######
+    train_dataset = RNNDataset(train_data, seq_len)
+    val_dataset = RNNDataset(val_data, seq_len)
+    test_dataset = RNNDataset(test_data, seq_len)
+
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    rnn_model = RNN(input_size=1, hidden_size=64, output_size=1, num_layers=2).to(device)
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(rnn_model.parameters(), lr=0.001)
+
+    rnn_model = train_rnn_model(rnn_model, train_loader, val_loader, criterion, optimizer, device, epochs=10)
+    rnn_predictions = rnn_forecast(rnn_model, test_loader, device)
+    result["RNN"] = rnn_predictions.tolist()
 
     return result
 
