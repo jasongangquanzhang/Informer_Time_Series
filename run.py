@@ -545,7 +545,7 @@ def find_best_model(
 
 def rnn_forecast(train_data, val_data, test_data):
     # RNN
-    input_size_list = [1, 2, 3]
+    input_size_list = [1]
     output_size = 1
     lr_list = [0.01, 0.001]
     layer_list = [
@@ -589,25 +589,25 @@ def rnn_forecast(train_data, val_data, test_data):
             val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False)
             test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
-            # DNN
-            best_config, best_lr, best_model_results, best_W = find_best_model(
-                T1,
-                T2,
-                input_size,
-                output_size,
-                lr_list,
-                layer_list,
-                train_loader,
-                val_loader,
-                test_loader,
-                "DNN",
-            )
+            # # DNN
+            # best_config, best_lr, best_model_results, best_W = find_best_model(
+            #     T1,
+            #     T2,
+            #     input_size,
+            #     output_size,
+            #     lr_list,
+            #     layer_list,
+            #     train_loader,
+            #     val_loader,
+            #     test_loader,
+            #     "DNN",
+            # )
 
-            best_val_loss_for_config_DNN = best_model_results[0]
-            if best_val_loss_for_config_DNN < best_val_loss_DNN:
-                best_val_loss_DNN = best_val_loss_for_config_DNN
-                best_input_size_DNN = input_size
-                DNN_pred = best_model_results[3]
+            # best_val_loss_for_config_DNN = best_model_results[0]
+            # if best_val_loss_for_config_DNN < best_val_loss_DNN:
+            #     best_val_loss_DNN = best_val_loss_for_config_DNN
+            #     best_input_size_DNN = input_size
+            #     DNN_pred = best_model_results[3]
 
             # RNN
             best_config, best_lr, best_model_results, best_W = find_best_model(
@@ -629,18 +629,19 @@ def rnn_forecast(train_data, val_data, test_data):
                 best_input_size_RNN = input_size
                 RNN_pred = best_model_results[3]
 
-        DNN_ensemble.append(DNN_pred)
+        # DNN_ensemble.append(DNN_pred)
         RNN_ensemble.append(RNN_pred)
 
     RNN_ensemble1 = np.zeros((ensemble, len(test_X) - (T1 + T2)))
-    DNN_ensemble1 = np.zeros((ensemble, len(test_X) - (T1 + T2)))
+    # DNN_ensemble1 = np.zeros((ensemble, len(test_X) - (T1 + T2)))
 
     for i in range(ensemble):
-        DNN_ensemble1[i, :] = DNN_ensemble[i]
+        # DNN_ensemble1[i, :] = DNN_ensemble[i]
         RNN_ensemble1[i, :] = RNN_ensemble[i]
 
-    DNN_pred = np.mean(DNN_ensemble1, axis=0)
+    # DNN_pred = np.mean(DNN_ensemble1, axis=0)
     RNN_pred = np.mean(RNN_ensemble1, axis=0)
+    return RNN_pred
 
 
 # Main function
