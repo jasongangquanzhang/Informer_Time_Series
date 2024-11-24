@@ -297,6 +297,7 @@ def create_lagged_features(series, lag):
         y.append(series[i])  # 当前时间步的元素作为目标值
     return np.array(X), np.array(y)
 
+
 class RNNDataset(Dataset):
     def __init__(self, X, y, seq_length):
         self.X = X
@@ -407,7 +408,7 @@ def train_and_evaluate(
             best_val_loss = val_loss
             best_model_state = deepcopy(model.state_dict())
 
-        early_stopping(val_loss,model=model)
+        early_stopping(val_loss, model=model)
         if early_stopping.early_stop:
             print("Early stopping")
             break
@@ -558,9 +559,9 @@ def rnn_forecast(train_data, val_data, test_data):
 
     # lr_list = [0.01]
     # layer_list = [([4], 4, [4])]
-    Xtrain =np.vectorize(float)(train_data)
-    Xval =np.vectorize(float)(val_data)
-    Xtest =np.vectorize(float)(test_data)
+    Xtrain = np.vectorize(float)(train_data)
+    Xval = np.vectorize(float)(val_data)
+    Xtest = np.vectorize(float)(test_data)
     series = np.concatenate((Xtrain, Xval, Xtest))
     series = series[..., np.newaxis].astype(np.float32)
 
@@ -675,47 +676,49 @@ def main():
 
     # Model setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-    model = Informer(
-        enc_in=1,
-        dec_in=1,
-        c_out=1,
-        seq_len=seq_len,
-        label_len=label_len,
-        out_len=pred_len,
-        factor=5,
-        d_model=512,
-        n_heads=8,
-        e_layers=2,
-        d_layers=1,
-        d_ff=2048,
-        dropout=0.05,
-        attn="prob",
-        embed="fixed",
-        freq="h",
-        activation="gelu",
-        output_attention=False,
-        distil=True,
-        mix=True,
-        device=device,
-    ).to(device)
+    # print(f"Using device: {device}")
+    # model = Informer(
+    #     enc_in=1,
+    #     dec_in=1,
+    #     c_out=1,
+    #     seq_len=seq_len,
+    #     label_len=label_len,
+    #     out_len=pred_len,
+    #     factor=5,
+    #     d_model=512,
+    #     n_heads=8,
+    #     e_layers=2,
+    #     d_layers=1,
+    #     d_ff=2048,
+    #     dropout=0.05,
+    #     attn="prob",
+    #     embed="fixed",
+    #     freq="h",
+    #     activation="gelu",
+    #     output_attention=False,
+    #     distil=True,
+    #     mix=True,
+    #     device=device,
+    # ).to(device)
 
-    # Training setup
-    criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
-    train(
-        model, train_loader, val_loader, criterion, optimizer, epochs=10, device=device
-    )
+    # # Training setup
+    # criterion = torch.nn.MSELoss()
+    # optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+    # train(
+    #     model, train_loader, val_loader, criterion, optimizer, epochs=10, device=device
+    # )
 
-    ###### Iterative Prediction ######
-    informer_predictions = iterative_prediction_with_update(
-        model, test_data, seq_len, label_len, pred_len, target_len, device
-    )
-    result["Informer"] = informer_predictions
+    # ###### Iterative Prediction ######
+    # informer_predictions = iterative_prediction_with_update(
+    #     model, test_data, seq_len, label_len, pred_len, target_len, device
+    # )
+    # result["Informer"] = informer_predictions
 
     ###### RNN Module ######
 
-    rnn_predictions = rnn_forecast(train_data = train_data, val_data=val_data, test_data=test_data)
+    rnn_predictions = rnn_forecast(
+        train_data=train_data, val_data=val_data, test_data=test_data
+    )
     result["RNN"] = rnn_predictions.tolist()
 
     return result
@@ -738,6 +741,7 @@ if __name__ == "__main__":
     ma = [1, 0.4]  # MA coefficients
     # informer setting
     seq_len, label_len, pred_len = 50, 10, 1
+    RNN_seq_len = seq_len + label_len
 
     output_file = "csv_results/result_2.csv"
 
