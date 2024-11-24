@@ -357,7 +357,7 @@ def train_and_evaluate(
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr)
 
-    early_stopping = EarlyStopping(patience=100, min_delta=0.0001)
+    early_stopping = EarlyStopping(patience=100, delta=0.0001)
 
     # Training and validation loop
     num_epochs = 2000
@@ -739,7 +739,7 @@ if __name__ == "__main__":
     # informer setting
     seq_len, label_len, pred_len = 50, 10, 1
 
-    output_file = "csv_results/result_1.csv"
+    output_file = "csv_results/result_2.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
