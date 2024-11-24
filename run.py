@@ -407,7 +407,7 @@ def train_and_evaluate(
             best_val_loss = val_loss
             best_model_state = deepcopy(model.state_dict())
 
-        early_stopping(val_loss)
+        early_stopping(val_loss,model=model)
         if early_stopping.early_stop:
             print("Early stopping")
             break
