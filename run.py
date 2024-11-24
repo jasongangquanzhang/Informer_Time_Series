@@ -1,4 +1,3 @@
-
 import os
 import torch
 import numpy as np
@@ -9,6 +8,7 @@ from torch.utils.data import DataLoader, Dataset
 from models.model import (
     Informer,
 )  # Assuming Informer model is already defined and available
+from models.RNN import CustomReLUNet, CustomReLURNN
 from sklearn.metrics import mean_squared_error
 from statsmodels.tsa.arima_process import ArmaProcess
 import argparse
@@ -75,7 +75,7 @@ def rolling_auto_arima(
     forecasts = []
 
     # Use auto_arima to determine the best ARIMA order
-    try: 
+    try:
         arima_model = auto_arima(
             train,
             seasonal=seasonal,
@@ -102,6 +102,7 @@ def rolling_auto_arima(
         arima_model.update(new_data)
 
     return forecasts
+
 
 class EarlyStopping:
     def __init__(self, patience=5, verbose=False, delta=0, path="checkpoint.pth"):
@@ -170,28 +171,46 @@ class TimeSeriesDataset(Dataset):
         )
 
 
-def iterative_prediction_with_update(model, test_data, seq_len, label_len, pred_len,target_len, device):
+def iterative_prediction_with_update(
+    model, test_data, seq_len, label_len, pred_len, target_len, device
+):
     """
     Perform iterative prediction and update the model with each new prediction and true value.
     """
     predictions = []
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)  # Use the same optimizer as during training
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=0.0001
+    )  # Use the same optimizer as during training
     criterion = torch.nn.MSELoss()  # Define the loss function
-
 
     for step in range(target_len):
         # Initialize encoder and decoder inputs
-        enc_in = torch.tensor(test_data[step:step+seq_len], dtype=torch.float32).unsqueeze(0).unsqueeze(-1).to(device)
-        dec_in = torch.tensor(test_data[step+seq_len - label_len:step+seq_len + pred_len], dtype=torch.float32).unsqueeze(0).unsqueeze(-1).to(device)
+        enc_in = (
+            torch.tensor(test_data[step : step + seq_len], dtype=torch.float32)
+            .unsqueeze(0)
+            .unsqueeze(-1)
+            .to(device)
+        )
+        dec_in = (
+            torch.tensor(
+                test_data[step + seq_len - label_len : step + seq_len + pred_len],
+                dtype=torch.float32,
+            )
+            .unsqueeze(0)
+            .unsqueeze(-1)
+            .to(device)
+        )
 
         # Set the last point of decoder input to 0
-        
+
         dec_in[:, -1, :] = 0
 
         # Make a prediction
         model.eval()
         with torch.no_grad():
-            pred = model(enc_in, enc_in, dec_in, dec_in).squeeze(-1).cpu().numpy()[0, -1]
+            pred = (
+                model(enc_in, enc_in, dec_in, dec_in).squeeze(-1).cpu().numpy()[0, -1]
+            )
 
         # Append prediction and true value to the results
         predictions.append(pred)
@@ -200,14 +219,19 @@ def iterative_prediction_with_update(model, test_data, seq_len, label_len, pred_
         model.train()
         enc_input_update = enc_in.detach().clone()
         dec_input_update = dec_in.detach().clone()
-        true_value = torch.tensor([[test_data[seq_len + step]]], dtype=torch.float32).to(device)
+        true_value = torch.tensor(
+            [[test_data[seq_len + step]]], dtype=torch.float32
+        ).to(device)
 
         optimizer.zero_grad()
-        updated_pred = model(enc_input_update, enc_input_update, dec_input_update, dec_input_update).squeeze(-1)
+        updated_pred = model(
+            enc_input_update, enc_input_update, dec_input_update, dec_input_update
+        ).squeeze(-1)
         loss = criterion(updated_pred.squeeze(-1), true_value.squeeze(-1))
         loss.backward()
         optimizer.step()
     return predictions
+
 
 # Train the Informer model
 def train(model, train_loader, val_loader, criterion, optimizer, epochs, device):
@@ -261,78 +285,362 @@ def train(model, train_loader, val_loader, criterion, optimizer, epochs, device)
             model.load_state_dict(torch.load(checkpoint_path))
             break
 
-###### Define RNN Module ######
-class RNN(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, num_layers):
-        super(RNN, self).__init__()
-        self.rnn = nn.RNN(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_size, output_size)
 
-    def forward(self, x):
-        out, _ = self.rnn(x)
-        out = self.fc(out[:, -1, :])
-        return out
+################################### RNN ##################################
+# 定义滞后函数，生成滞后一阶和二阶的数据
+def create_lagged_features(series, lag):
+    X, y = [], []
+    lags = list(range(1, lag + 1))
+    for i in range(max(lags), len(series)):
+        features = [series[i - lag] for lag in lags]  # 获取滞后的元素
+        X.append(features)
+        y.append(series[i])  # 当前时间步的元素作为目标值
+    return np.array(X), np.array(y)
 
-def train_rnn_model(model, train_loader, val_loader, criterion, optimizer, device, epochs=10):
+class RNNDataset(Dataset):
+    def __init__(self, X, y, seq_length):
+        self.X = X
+        self.y = y
+        self.seq_length = seq_length
+
+    def __len__(self):
+        return self.X.shape[0] - self.seq_length
+
+    def __getitem__(self, idx):
+        X1 = torch.tensor(self.X[idx : idx + self.seq_length + 1].squeeze(-1))
+        y1 = torch.tensor(self.y[idx : idx + self.seq_length + 1])
+        return X1, y1
+
+
+def train_and_evaluate(
+    T1,
+    T2,
+    input_size,
+    output_size,
+    relu_layer_sizes_before,
+    hidden_layers,
+    relu_layer_sizes_after,
+    lr,
+    train_loader,
+    val_loader,
+    test_loader,
+    model_type="RNN",
+):
+    """
+    Train and evaluate either an RNN or DNN model based on the model_type input.
+
+    Parameters:
+    - model_type: "RNN" for CustomReLURNN, "DNN" for CustomReLUNet
+    """
+
+    # Select the model based on model_type
+    if model_type == "RNN":
+        model = CustomReLURNN(
+            input_size,
+            hidden_layers,
+            output_size,
+            relu_layer_sizes_before,
+            relu_layer_sizes_after,
+        )
+    elif model_type == "DNN":
+        model = CustomReLUNet(
+            input_size,
+            hidden_layers,
+            output_size,
+            relu_layer_sizes_before,
+            relu_layer_sizes_after,
+        )
+    else:
+        raise ValueError("Invalid model_type. Choose 'RNN' or 'DNN'.")
+
+    # Define loss function and optimizer
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr)
+
+    early_stopping = EarlyStopping(patience=100, min_delta=0.0001)
+
+    # Training and validation loop
+    num_epochs = 2000
+    train_losses = []
+    val_losses = []
+
+    # Track the best model
     best_val_loss = float("inf")
     best_model_state = None
 
-    for epoch in range(epochs):
+    # Training loop
+    for epoch in range(num_epochs):
         model.train()
         train_loss = 0
-        for x, y in train_loader:
-            x, y = x.to(device), y.to(device)
+        for X_batch, y_batch in train_loader:
+            # print(X_batch.shape)
             optimizer.zero_grad()
-            output = model(x)
-            loss = criterion(output, y)
+            outputs = model(X_batch)
+            loss = criterion(outputs, y_batch)
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
         train_loss /= len(train_loader)
+        train_losses.append(train_loss)
 
+        # Validation loop
         model.eval()
-        val_loss = 0
+        val_loss = 0.0
         with torch.no_grad():
-            for x, y in val_loader:
-                x, y = x.to(device), y.to(device)
-                output = model(x)
-                loss = criterion(output, y)
+            for X_val, y_val in val_loader:
+                val_outputs = model(X_val)
+                val_outputs = val_outputs.reshape(-1)
+                # print(val_outputs.shape)
+                y1_val = y_val.reshape(-1)
+                loss = criterion(val_outputs[T1:], y1_val[T1:])
                 val_loss += loss.item()
         val_loss /= len(val_loader)
+        val_losses.append(val_loss)
 
-        print(f"Epoch [{epoch+1}/{epochs}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
+        if (epoch + 1) % 50 == 0:
+            print(
+                f"Epoch [{epoch+1}/{num_epochs}], Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}"
+            )
 
+        # Save the best model
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             best_model_state = deepcopy(model.state_dict())
 
+        early_stopping(val_loss)
+        if early_stopping.early_stop:
+            print("Early stopping")
+            break
+
+    # Load the best model
     if best_model_state is not None:
         model.load_state_dict(best_model_state)
-    return model
 
-def rnn_forecast(model, test_loader, device):
+    # Test evaluation
     model.eval()
-    predictions = []
+    test_loss = 0
     with torch.no_grad():
-        for x, _ in test_loader:
-            x = x.to(device)
-            output = model(x)
-            predictions.append(output.squeeze(-1).cpu().numpy())
-    return np.concatenate(predictions)
+        for X_test, y_test in test_loader:
+            test_outputs = model(X_test)
+            test_outputs = test_outputs.reshape(-1)
+            y1_test = y_test.reshape(-1)
+            loss = criterion(test_outputs[(T1 + T2) :], y1_test[(T1 + T2) :])
+            test_loss += loss.item()
 
-###### Custom Dataset ######
-class RNNDataset(Dataset):
-    def __init__(self, data, seq_len):
-        self.data = data
-        self.seq_len = seq_len
+    test_loss /= len(test_loader)
+    if model_type == "RNN":
+        W = model.get_W()
+    else:
+        W = None
+    pred = np.array(test_outputs[(T1 + T2) :])
+    print(f"Test Loss: {test_loss:.4f}")
 
-    def __len__(self):
-        return len(self.data) - self.seq_len
+    return best_val_loss, train_losses, val_losses, pred, test_loss, W
 
-    def __getitem__(self, idx):
-        x = self.data[idx:idx + self.seq_len]
-        y = self.data[idx + self.seq_len]
-        return torch.tensor(x, dtype=torch.float32).unsqueeze(-1), torch.tensor(y, dtype=torch.float32)
+
+def find_best_model(
+    T1,
+    T2,
+    input_size,
+    output_size,
+    lr_list,
+    layer_list,
+    train_loader,
+    val_loader,
+    test_loader,
+    model_type="RNN",
+):
+    """
+    Find the best model configuration by looping over different layer configurations and learning rates.
+    Select either an RNN or DNN model based on the model_type parameter.
+
+    Parameters:
+    - T: Sequence length
+    - input_size: Size of the input features
+    - output_size: Size of the output
+    - lr_list: List of learning rates to try
+    - layer_list: List of configurations of relu_layer_sizes_before, hidden_layers, and relu_layer_sizes_after
+    - train_loader, val_loader, test_loader: Data loaders for training, validation, and test sets
+    - EX_T: Expected values (for comparison in test set)
+    - model_type: Either "RNN" or "DNN" to choose the model architecture
+
+    Returns:
+    - best_config: Best layer configuration
+    - best_lr: Best learning rate
+    - best_model_results: Results (losses and predictions) of the best model
+    - best_W: Weights of the best model
+    """
+
+    best_config = None
+    best_lr = None
+    best_val_loss = float("inf")
+    best_model_results = None
+    best_W = None
+
+    # Loop over all layer configurations
+    for relu_layer_sizes_before, hidden_layers, relu_layer_sizes_after in layer_list:
+        print(
+            f"Training with layer config: {relu_layer_sizes_before}, {hidden_layers}, {relu_layer_sizes_after}"
+        )
+
+        # Initialize variables to track the best learning rate for this specific layer configuration
+        best_lr_for_config = None
+        best_val_loss_for_config = float("inf")
+        best_model_results_for_config = None
+        best_W_for_config = None
+
+        # Loop over learning rates for the current layer configuration
+        for lr in lr_list:
+            print(f"Training with learning rate: {lr}")
+
+            # Call train_and_evaluate function to train the model and evaluate
+            val_loss, train_losses, val_losses, pred, test_loss, W = train_and_evaluate(
+                T1,
+                T2,
+                input_size,
+                output_size,
+                relu_layer_sizes_before,
+                hidden_layers,
+                relu_layer_sizes_after,
+                lr,
+                train_loader,
+                val_loader,
+                test_loader,
+                model_type,
+            )
+
+            print(
+                f"Learning Rate: {lr}, Validation Loss: {val_loss:.4f}, Test Loss: {test_loss:.4f}"
+            )
+
+            # Update the best learning rate for this configuration if validation loss improves
+            if val_loss < best_val_loss_for_config:
+                best_val_loss_for_config = val_loss
+                best_lr_for_config = lr
+                best_model_results_for_config = (
+                    val_loss,
+                    train_losses,
+                    val_losses,
+                    pred,
+                    test_loss,
+                )
+                best_W_for_config = W
+
+        # After going through all learning rates for the current layer configuration,
+        # check if this configuration (with its best learning rate) is the best overall
+        if best_val_loss_for_config < best_val_loss:
+            best_val_loss = best_val_loss_for_config
+            best_config = (
+                relu_layer_sizes_before,
+                hidden_layers,
+                relu_layer_sizes_after,
+            )
+            best_lr = best_lr_for_config
+            best_model_results = best_model_results_for_config
+            best_W = best_W_for_config
+
+    # Return the best model configuration, learning rate, model results, and weights
+    return best_config, best_lr, best_model_results, best_W
+
+
+def rnn_forecast(train_data, val_data, test_data):
+    # RNN
+    input_size_list = [1, 2, 3]
+    output_size = 1
+    lr_list = [0.01, 0.001]
+    layer_list = [
+        ([4], 4, [4]),
+        ([8], 4, [8]),
+        ([8], 8, [8]),
+        ([4, 8], 8, [8, 4]),
+        ([8, 16], 8, [+16, 8]),
+    ]
+
+    # lr_list = [0.01]
+    # layer_list = [([4], 4, [4])]
+    Xtrain =np.vectorize(float)(train_data)
+    Xval =np.vectorize(float)(val_data)
+    Xtest =np.vectorize(float)(test_data)
+    series = np.concatenate((Xtrain, Xval, Xtest))
+    series = series[..., np.newaxis].astype(np.float32)
+
+    # ensembling
+    DNN_ensemble = []
+    RNN_ensemble = []
+    ensemble = 1
+    for rep in range(ensemble):  #########################
+        best_val_loss_RNN = float("inf")
+        best_val_loss_DNN = float("inf")
+        for input_size in input_size_list:
+            # print(input_size)
+            X, y = create_lagged_features(series, lag=input_size)
+
+            T1 = len(Xtrain) - input_size
+            T2 = len(Xval)
+            train_X, train_y = X[:T1], y[:T1]
+            val_X, val_y = X[: (T1 + T2)], y[: (T1 + T2)]
+            test_X, test_y = X, y
+
+            train_dataset = RNNDataset(train_X, train_y, train_X.shape[0] - 1)
+            val_dataset = RNNDataset(val_X, val_y, val_X.shape[0] - 1)
+            test_dataset = RNNDataset(test_X, test_y, test_X.shape[0] - 1)
+
+            train_loader = DataLoader(train_dataset, batch_size=1, shuffle=False)
+            val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False)
+            test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+
+            # DNN
+            best_config, best_lr, best_model_results, best_W = find_best_model(
+                T1,
+                T2,
+                input_size,
+                output_size,
+                lr_list,
+                layer_list,
+                train_loader,
+                val_loader,
+                test_loader,
+                "DNN",
+            )
+
+            best_val_loss_for_config_DNN = best_model_results[0]
+            if best_val_loss_for_config_DNN < best_val_loss_DNN:
+                best_val_loss_DNN = best_val_loss_for_config_DNN
+                best_input_size_DNN = input_size
+                DNN_pred = best_model_results[3]
+
+            # RNN
+            best_config, best_lr, best_model_results, best_W = find_best_model(
+                T1,
+                T2,
+                input_size,
+                output_size,
+                lr_list,
+                layer_list,
+                train_loader,
+                val_loader,
+                test_loader,
+                "RNN",
+            )
+
+            best_val_loss_for_config_RNN = best_model_results[0]
+            if best_val_loss_for_config_RNN < best_val_loss_RNN:
+                best_val_loss_RNN = best_val_loss_for_config_RNN
+                best_input_size_RNN = input_size
+                RNN_pred = best_model_results[3]
+
+        DNN_ensemble.append(DNN_pred)
+        RNN_ensemble.append(RNN_pred)
+
+    RNN_ensemble1 = np.zeros((ensemble, len(test_X) - (T1 + T2)))
+    DNN_ensemble1 = np.zeros((ensemble, len(test_X) - (T1 + T2)))
+
+    for i in range(ensemble):
+        DNN_ensemble1[i, :] = DNN_ensemble[i]
+        RNN_ensemble1[i, :] = RNN_ensemble[i]
+
+    DNN_pred = np.mean(DNN_ensemble1, axis=0)
+    RNN_pred = np.mean(RNN_ensemble1, axis=0)
 
 
 # Main function
@@ -394,34 +702,22 @@ def main():
     # Training setup
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
-    train(model, train_loader, val_loader, criterion, optimizer, epochs=10, device=device)
+    train(
+        model, train_loader, val_loader, criterion, optimizer, epochs=10, device=device
+    )
 
     ###### Iterative Prediction ######
     informer_predictions = iterative_prediction_with_update(
         model, test_data, seq_len, label_len, pred_len, target_len, device
     )
     result["Informer"] = informer_predictions
-    
+
     ###### RNN Module ######
-    train_dataset = RNNDataset(train_data, seq_len)
-    val_dataset = RNNDataset(val_data, seq_len)
-    test_dataset = RNNDataset(test_data, seq_len)
 
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    rnn_model = RNN(input_size=1, hidden_size=64, output_size=1, num_layers=2).to(device)
-    criterion = nn.MSELoss()
-    optimizer = optim.Adam(rnn_model.parameters(), lr=0.001)
-
-    rnn_model = train_rnn_model(rnn_model, train_loader, val_loader, criterion, optimizer, device, epochs=10)
-    rnn_predictions = rnn_forecast(rnn_model, test_loader, device)
+    rnn_predictions = rnn_forecast(train_data = train_data, val_data=val_data, test_data=test_data)
     result["RNN"] = rnn_predictions.tolist()
 
     return result
-
 
 
 if __name__ == "__main__":
@@ -443,12 +739,12 @@ if __name__ == "__main__":
     seq_len, label_len, pred_len = 50, 10, 1
 
     output_file = "csv_results/result_1.csv"
-    
+
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
     checkpoint_path = os.path.join(checkpoint_dir, f"best_model_seed_{seed}.pth")
     result = main()
-    
+
     with FileLock(output_file + ".lock"):
         if os.path.exists(output_file):
             # Append results to the existing file
