@@ -715,7 +715,7 @@ def main():
     # result["Informer"] = informer_predictions
 
     ###### RNN Module ######
-
+    test_data = data[train_len:]
     rnn_predictions = rnn_forecast(
         train_data=train_data, val_data=val_data, test_data=test_data
     )
