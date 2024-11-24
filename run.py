@@ -676,43 +676,43 @@ def main():
 
     # Model setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # print(f"Using device: {device}")
-    # model = Informer(
-    #     enc_in=1,
-    #     dec_in=1,
-    #     c_out=1,
-    #     seq_len=seq_len,
-    #     label_len=label_len,
-    #     out_len=pred_len,
-    #     factor=5,
-    #     d_model=512,
-    #     n_heads=8,
-    #     e_layers=2,
-    #     d_layers=1,
-    #     d_ff=2048,
-    #     dropout=0.05,
-    #     attn="prob",
-    #     embed="fixed",
-    #     freq="h",
-    #     activation="gelu",
-    #     output_attention=False,
-    #     distil=True,
-    #     mix=True,
-    #     device=device,
-    # ).to(device)
+    print(f"Using device: {device}")
+    model = Informer(
+        enc_in=1,
+        dec_in=1,
+        c_out=1,
+        seq_len=seq_len,
+        label_len=label_len,
+        out_len=pred_len,
+        factor=5,
+        d_model=512,
+        n_heads=8,
+        e_layers=2,
+        d_layers=1,
+        d_ff=2048,
+        dropout=0.05,
+        attn="prob",
+        embed="fixed",
+        freq="h",
+        activation="gelu",
+        output_attention=False,
+        distil=True,
+        mix=True,
+        device=device,
+    ).to(device)
 
-    # # Training setup
-    # criterion = torch.nn.MSELoss()
-    # optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
-    # train(
-    #     model, train_loader, val_loader, criterion, optimizer, epochs=10, device=device
-    # )
+    # Training setup
+    criterion = torch.nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+    train(
+        model, train_loader, val_loader, criterion, optimizer, epochs=10, device=device
+    )
 
-    # ###### Iterative Prediction ######
-    # informer_predictions = iterative_prediction_with_update(
-    #     model, test_data, seq_len, label_len, pred_len, target_len, device
-    # )
-    # result["Informer"] = informer_predictions
+    ###### Iterative Prediction ######
+    informer_predictions = iterative_prediction_with_update(
+        model, test_data, seq_len, label_len, pred_len, target_len, device
+    )
+    result["Informer"] = informer_predictions
 
     ###### RNN Module ######
     test_data = data[train_len:]
