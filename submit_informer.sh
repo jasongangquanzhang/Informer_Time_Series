@@ -6,7 +6,7 @@
 #SBATCH --partition=amd
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
-#SBATCH --array=1-10
+#SBATCH --array=1-100
 module load python/anaconda-2023.09
 source activate ganett
 
