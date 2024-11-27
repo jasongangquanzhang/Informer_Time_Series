@@ -234,8 +234,21 @@ def iterative_prediction_with_update(
 
 
 # Train the Informer model
-def train(model, train_loader, val_loader, criterion, optimizer, epochs, device):
+def train(
+    model,
+    train_loader,
+    val_loader,
+    criterion,
+    optimizer,
+    epochs,
+    device,
+    checkpoint_path="checkpoint.pth",
+):
+    """
+    Train the model and return the final validation loss.
+    """
     early_stopping = EarlyStopping(patience=5, verbose=True, path=checkpoint_path)
+    best_val_loss = float("inf")  # Track the best validation loss
 
     for epoch in range(epochs):
         model.train()
@@ -280,10 +293,194 @@ def train(model, train_loader, val_loader, criterion, optimizer, epochs, device)
 
         # Check early stopping
         early_stopping(val_loss, model)
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss  # Update best validation loss
+
         if early_stopping.early_stop:
             print("Early stopping triggered. Loading the best model...")
             model.load_state_dict(torch.load(checkpoint_path))
             break
+
+    return best_val_loss
+
+
+# def informer_predict(informer_len, data):
+
+#     # Split training data into train and validation sets
+#     train_len = data_length - target_len
+#     train_split = int(train_len * 0.8)
+#     train_data = data[:train_split]
+#     val_data = data[train_split:train_len]
+#     for seq_len, label_len in informer_len:
+#         test_data = data[train_len - seq_len :]
+#         for lr in lr_lst:
+
+#             # Split training data into train and validation sets
+
+#             # Prepare datasets and loaders
+#             train_dataset = TimeSeriesDataset(train_data, seq_len, label_len, pred_len)
+#             val_dataset = TimeSeriesDataset(val_data, seq_len, label_len, pred_len)
+#             train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+#             val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+#             # Prepare datasets and loaders
+#             train_dataset = TimeSeriesDataset(train_data, seq_len, label_len, pred_len)
+#             val_dataset = TimeSeriesDataset(val_data, seq_len, label_len, pred_len)
+#             train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+#             val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+
+#             # Model setup
+#             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#             print(f"Using device: {device}")
+#             model = Informer(
+#                 enc_in=1,
+#                 dec_in=1,
+#                 c_out=1,
+#                 seq_len=seq_len,
+#                 label_len=label_len,
+#                 out_len=pred_len,
+#                 factor=5,
+#                 d_model=512,
+#                 n_heads=8,
+#                 e_layers=2,
+#                 d_layers=1,
+#                 d_ff=2048,
+#                 dropout=0.05,
+#                 attn="prob",
+#                 embed="fixed",
+#                 freq="h",
+#                 activation="gelu",
+#                 output_attention=False,
+#                 distil=True,
+#                 mix=True,
+#                 device=device,
+#             ).to(device)
+
+#             # Training setup
+#             criterion = torch.nn.MSELoss()
+#             optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+#             train(
+#                 model, train_loader, val_loader, criterion, optimizer, epochs=10, device=device
+#             )
+
+#         ###### Iterative Prediction ######
+#         informer_predictions = iterative_prediction_with_update(
+#             model, test_data, seq_len, label_len, pred_len, target_len, device
+#         )
+
+#     return informer_predictions
+
+
+def informer_predict(informer_len_combinations, data):
+    """
+    Perform grid search over seq_len and label_len combinations to choose the best one based on validation loss.
+    """
+    train_len = len(data) - target_len
+    train_split = int(train_len * 0.8)
+    train_data = data[:train_split]
+    val_data = data[train_split:train_len]
+
+    best_val_loss = float("inf")
+    best_combination = None
+    best_model = None
+
+    # Iterate over all seq_len and label_len combinations
+    for seq_len, label_len in informer_len_combinations:
+        for lr in lr_lst:
+            # Prepare datasets and loaders
+            train_dataset = TimeSeriesDataset(train_data, seq_len, label_len, pred_len)
+            val_dataset = TimeSeriesDataset(val_data, seq_len, label_len, pred_len)
+            train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+            val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+
+            # Model setup
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            print(f"Using device: {device}")
+            model = Informer(
+                enc_in=1,
+                dec_in=1,
+                c_out=1,
+                seq_len=seq_len,
+                label_len=label_len,
+                out_len=pred_len,
+                factor=5,
+                d_model=512,
+                n_heads=8,
+                e_layers=2,
+                d_layers=1,
+                d_ff=2048,
+                dropout=0.05,
+                attn="prob",
+                embed="fixed",
+                freq="h",
+                activation="gelu",
+                output_attention=False,
+                distil=True,
+                mix=True,
+                device=device,
+            ).to(device)
+
+            # Training setup
+            criterion = torch.nn.MSELoss()
+            optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+            val_loss = train(
+                model,
+                train_loader,
+                val_loader,
+                criterion,
+                optimizer,
+                epochs=10,
+                device=device,
+            )
+
+            # Update the best combination
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                best_combination = (seq_len, label_len)
+                best_model = model.state_dict()  # Save model parameters
+
+    print(
+        f"Best Combination: seq_len: {best_combination[0]}, label_len: {best_combination[1]}, Val Loss: {best_val_loss:.4f}"
+    )
+
+    # Load the best model
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = Informer(
+        enc_in=1,
+        dec_in=1,
+        c_out=1,
+        seq_len=best_combination[0],
+        label_len=best_combination[1],
+        out_len=pred_len,
+        factor=5,
+        d_model=512,
+        n_heads=8,
+        e_layers=2,
+        d_layers=1,
+        d_ff=2048,
+        dropout=0.05,
+        attn="prob",
+        embed="fixed",
+        freq="h",
+        activation="gelu",
+        output_attention=False,
+        distil=True,
+        mix=True,
+        device=device,
+    ).to(device)
+    model.load_state_dict(best_model)
+
+    # Perform iterative prediction using the best model
+    informer_predictions = iterative_prediction_with_update(
+        model,
+        data[train_len - seq_len :],
+        best_combination[0],
+        best_combination[1],
+        pred_len,
+        target_len,
+        device,
+    )
+
+    return informer_predictions, best_combination
 
 
 ################################### RNN ##################################
@@ -661,60 +858,16 @@ def main():
     result["ARMA"] = arma_predictions
 
     ###### Informer Module ######
+    informer_pred, informer_para = informer_predict(
+        informer_len_combinations=informer_len, data=data
+    )
+    result["Informer"] = informer_pred
+    result["Informer_para"] = informer_para
+    ###### RNN Module ######
     train_len = data_length - target_len
     train_split = int(train_len * 0.8)
     train_data = data[:train_split]
     val_data = data[train_split:train_len]
-    test_data = data[train_len - seq_len :]
-    # Split training data into train and validation sets
-
-    # Prepare datasets and loaders
-    train_dataset = TimeSeriesDataset(train_data, seq_len, label_len, pred_len)
-    val_dataset = TimeSeriesDataset(val_data, seq_len, label_len, pred_len)
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
-
-    # Model setup
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-    model = Informer(
-        enc_in=1,
-        dec_in=1,
-        c_out=1,
-        seq_len=seq_len,
-        label_len=label_len,
-        out_len=pred_len,
-        factor=5,
-        d_model=512,
-        n_heads=8,
-        e_layers=2,
-        d_layers=1,
-        d_ff=2048,
-        dropout=0.05,
-        attn="prob",
-        embed="fixed",
-        freq="h",
-        activation="gelu",
-        output_attention=False,
-        distil=True,
-        mix=True,
-        device=device,
-    ).to(device)
-
-    # Training setup
-    criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
-    train(
-        model, train_loader, val_loader, criterion, optimizer, epochs=10, device=device
-    )
-
-    ###### Iterative Prediction ######
-    informer_predictions = iterative_prediction_with_update(
-        model, test_data, seq_len, label_len, pred_len, target_len, device
-    )
-    result["Informer"] = informer_predictions
-
-    ###### RNN Module ######
     test_data = data[train_len:]
     rnn_predictions = rnn_forecast(
         train_data=train_data, val_data=val_data, test_data=test_data
@@ -740,8 +893,9 @@ if __name__ == "__main__":
     ar = [1, -0.5, 0.25]  # AR coefficients
     ma = [1, 0.4]  # MA coefficients
     # informer setting
-    seq_len, label_len, pred_len = 50, 10, 1
-    RNN_seq_len = seq_len + label_len
+    pred_len = 1
+    informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
+    lr_lst = [0.01, 0.001, 0.0001]
 
     output_file = "csv_results/result_2.csv"
 
