@@ -430,6 +430,7 @@ def informer_predict(informer_len_combinations, data):
                 optimizer,
                 epochs=10,
                 device=device,
+                checkpoint_path=checkpoint_path
             )
 
             # Update the best combination
@@ -897,7 +898,7 @@ if __name__ == "__main__":
     informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
     lr_lst = [0.01, 0.001, 0.0001]
 
-    output_file = "csv_results/result_2.csv"
+    output_file = "csv_results/result_3.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
