@@ -7,6 +7,8 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
 #SBATCH --array=1-100
+#SBATCH --mem-per-cpu=8000
+
 module load python/anaconda-2023.09
 source activate ganett
 
