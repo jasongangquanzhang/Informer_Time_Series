@@ -851,7 +851,9 @@ def main():
 
     # Generate synthetic ARMA time series data
     data = generate_arma_time_series(ar, ma, data_length)
+    std = data.std()
     true_value = data[-target_len:].tolist()
+    result['STD'] = std
     result["True"] = true_value
 
     ###### ARMA Module ######
@@ -895,10 +897,13 @@ if __name__ == "__main__":
     ma = [1, 0.4]  # MA coefficients
     # informer setting
     pred_len = 1
-    informer_len = [(10, 2), (20, 4), (50, 10), (100, 20)]
-    lr_lst = [0.01, 0.001, 0.0001]
+    # informer_len = [(10, 2), (20, 4), (50, 10), (100, 20)]
+    # lr_lst = [0.01, 0.001, 0.0001]
+    
+    informer_len = [(50, 10)]
+    lr_lst = [0.0001]   
 
-    output_file = "csv_results/result_4.csv"
+    output_file = "csv_results/result_5.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
