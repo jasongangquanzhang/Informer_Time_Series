@@ -215,21 +215,21 @@ def iterative_prediction_with_update(
         # Append prediction and true value to the results
         predictions.append(pred)
 
-        # Update the model using the prediction and true value
-        model.train()
-        enc_input_update = enc_in.detach().clone()
-        dec_input_update = dec_in.detach().clone()
-        true_value = torch.tensor(
-            [[test_data[seq_len + step]]], dtype=torch.float32
-        ).to(device)
+        # # Update the model using the prediction and true value
+        # model.train()
+        # enc_input_update = enc_in.detach().clone()
+        # dec_input_update = dec_in.detach().clone()
+        # true_value = torch.tensor(
+        #     [[test_data[seq_len + step]]], dtype=torch.float32
+        # ).to(device)
 
-        optimizer.zero_grad()
-        updated_pred = model(
-            enc_input_update, enc_input_update, dec_input_update, dec_input_update
-        ).squeeze(-1)
-        loss = criterion(updated_pred.squeeze(-1), true_value.squeeze(-1))
-        loss.backward()
-        optimizer.step()
+        # optimizer.zero_grad()
+        # updated_pred = model(
+        #     enc_input_update, enc_input_update, dec_input_update, dec_input_update
+        # ).squeeze(-1)
+        # loss = criterion(updated_pred.squeeze(-1), true_value.squeeze(-1))
+        # loss.backward()
+        # optimizer.step()
     return predictions
 
 
