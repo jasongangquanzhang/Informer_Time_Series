@@ -428,7 +428,7 @@ def informer_predict(informer_len_combinations, data):
                 val_loader,
                 criterion,
                 optimizer,
-                epochs=10,
+                epochs=200,
                 device=device,
                 checkpoint_path=checkpoint_path
             )
