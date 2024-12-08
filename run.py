@@ -178,10 +178,10 @@ def iterative_prediction_with_update(
     Perform iterative prediction and update the model with each new prediction and true value.
     """
     predictions = []
-    optimizer = torch.optim.Adam(
-        model.parameters(), lr=0.0001
-    )  # Use the same optimizer as during training
-    criterion = torch.nn.MSELoss()  # Define the loss function
+    # optimizer = torch.optim.Adam(
+    #     model.parameters(), lr=0.0001
+    # )  # Use the same optimizer as during training
+    # criterion = torch.nn.MSELoss()  # Define the loss function
 
     for step in range(target_len):
         # Initialize encoder and decoder inputs
@@ -437,42 +437,43 @@ def informer_predict(informer_len_combinations, data):
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 best_combination = (seq_len, label_len)
-                best_model = model.state_dict()  # Save model parameters
+                best_model = model # Save model parameters
+                best_lr = lr
 
     print(
         f"Best Combination: seq_len: {best_combination[0]}, label_len: {best_combination[1]}, Val Loss: {best_val_loss:.4f}"
     )
 
-    # Load the best model
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = Informer(
-        enc_in=1,
-        dec_in=1,
-        c_out=1,
-        seq_len=best_combination[0],
-        label_len=best_combination[1],
-        out_len=pred_len,
-        factor=5,
-        d_model=512,
-        n_heads=8,
-        e_layers=2,
-        d_layers=1,
-        d_ff=2048,
-        dropout=0.05,
-        attn="prob",
-        embed="fixed",
-        freq="h",
-        activation="gelu",
-        output_attention=False,
-        distil=True,
-        mix=True,
-        device=device,
-    ).to(device)
-    model.load_state_dict(best_model)
+    # # Load the best model
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # model = Informer(
+    #     enc_in=1,
+    #     dec_in=1,
+    #     c_out=1,
+    #     seq_len=best_combination[0],
+    #     label_len=best_combination[1],
+    #     out_len=pred_len,
+    #     factor=5,
+    #     d_model=512,
+    #     n_heads=8,
+    #     e_layers=2,
+    #     d_layers=1,
+    #     d_ff=2048,
+    #     dropout=0.05,
+    #     attn="prob",
+    #     embed="fixed",
+    #     freq="h",
+    #     activation="gelu",
+    #     output_attention=False,
+    #     distil=True,
+    #     mix=True,
+    #     device=device,
+    # ).to(device)
+    # model.load_state_dict(best_model)
 
     # Perform iterative prediction using the best model
     informer_predictions = iterative_prediction_with_update(
-        model,
+        best_model,
         data[train_len - seq_len :],
         best_combination[0],
         best_combination[1],
@@ -481,7 +482,7 @@ def informer_predict(informer_len_combinations, data):
         device,
     )
 
-    return informer_predictions, best_combination
+    return informer_predictions, best_combination,best_lr
 
 
 ################################### RNN ##################################
@@ -861,11 +862,12 @@ def main():
     result["ARMA"] = arma_predictions
 
     ###### Informer Module ######
-    informer_pred, informer_para = informer_predict(
+    informer_pred, informer_para,informer_lr = informer_predict(
         informer_len_combinations=informer_len, data=data
     )
     result["Informer"] = informer_pred
     result["Informer_para"] = informer_para
+    result["Informer_lr"] = informer_lr
     ###### RNN Module ######
     train_len = data_length - target_len
     train_split = int(train_len * 0.8)
