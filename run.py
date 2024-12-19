@@ -272,7 +272,6 @@ def train(
                 dec_in = torch.cat(
                     [dec_in[:, 1:-1, :], target[:, step : step + 2, :]], dim=1
                 )
-            print(y_pred.size())
             loss = criterion(y_pred, target)
             loss.backward()
             optimizer.step()
@@ -871,14 +870,15 @@ if __name__ == "__main__":
     ma = [1, 0.4]  # MA coefficients
     # informer setting
     pred_len = 1
-    # informer_len = [(10, 2), (20, 4), (50, 10), (100, 20)]
-    # lr_lst = [0.01, 0.001, 0.0001]
+    informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
+    lr_lst = [0.0001,0.00001]
 
-    informer_len = [(50, 10)]
-    lr_lst = [0.0001]
+
+    # informer_len = [(50, 10)]
+    # lr_lst = [0.0001]
     # 6 cancel iterate update model
     # 7 add tune
-    output_file = "csv_results/result_7.csv"
+    output_file = "csv_results_mercury/result_4.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
