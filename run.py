@@ -871,7 +871,7 @@ if __name__ == "__main__":
     # informer setting
     pred_len = 1
     informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
-    lr_lst = [0.0001,0.00001]
+    lr_lst = [0.00001,0.000001]
 
 
     # informer_len = [(50, 10)]
