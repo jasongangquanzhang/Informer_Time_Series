@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --account=pi-dachxiu
 #SBATCH --mem=10G
-#SBATCH --time=0-12:00:00
+#SBATCH --time=0-24:00:00
 #SBATCH --job-name=informer_TS
-#SBATCH --partition=standard
+#SBATCH --partition=long
 #SBATCH --cpus-per-task=1
 #SBATCH --array=1-100
 
