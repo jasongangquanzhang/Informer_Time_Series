@@ -17,7 +17,7 @@ import sys
 from pmdarima import auto_arima
 from filelock import Timeout, FileLock
 from copy import deepcopy
-
+import matplotlib.pyplot as plt
 
 # Set up random seed
 def set_seed(seed):
@@ -26,6 +26,208 @@ def set_seed(seed):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
+
+def piecewise_function(x, theta_1, theta_2):
+    if x > 0:
+        return theta_1 * x
+    else:
+        return theta_2 * x
+
+
+def generatedata_ld(T, func_type, covis=False):
+    Z1 = np.random.uniform(-1, 1, T)
+    Z2 = np.random.uniform(-1, 1, T)
+    Z3 = np.random.uniform(-1, 1, T)
+    Z4 = np.random.uniform(-1, 1, T)
+    Z5 = np.random.uniform(-1, 1, T)
+    Z6 = np.random.uniform(-1, 1, T)
+    Z7 = np.random.uniform(-1, 1, T)
+    if func_type == "abs":
+        U = np.random.uniform(-1, 1, T)  # 生成长度为T的均匀分布随机数
+        theta_0 = 0.5
+        theta_1 = 0.5
+        X = [U[0]]  # 初始化序列
+        EX = [0]
+        for t in range(1, T):
+            X_t = theta_0 * abs(X[t - 1]) + U[t] + theta_1 * U[t - 1]
+            X.append(X_t)
+            EX_t = theta_0 * abs(X[t - 1]) + theta_1 * U[t - 1]
+            EX.append(EX_t)
+
+    elif func_type == "arma":
+        U = np.random.uniform(-1, 1, T)  # 生成长度为T的均匀分布随机数
+        theta_0 = 0.5
+        theta_1 = 0.5
+        X = [U[0]]  # 初始化序列
+        EX = [0]
+        for t in range(1, T):
+            X_t = theta_0 * X[t - 1] + U[t] + theta_1 * U[t - 1]
+            X.append(X_t)
+            EX_t = theta_0 * X[t - 1] + theta_1 * U[t - 1]
+            EX.append(EX_t)
+
+    elif func_type == "lin-non1":
+        U = np.random.uniform(-1, 1, T)  # 生成长度为T的均匀分布随机数
+        theta_0 = 0.5
+        theta_1 = 0.5
+        X = [U[0]]  # 初始化序列
+        EX = [0]
+        for t in range(1, T):
+            X_t = theta_0 * X[t - 1] + U[t] + theta_1 * U[t - 1] ** 2
+            X.append(X_t)
+            EX_t = theta_0 * X[t - 1] + theta_1 * U[t - 1] ** 2
+            EX.append(EX_t)
+
+    elif func_type == "lin-non":
+        U = np.random.uniform(-1, 1, T)  # 生成长度为T的均匀分布随机数
+        theta_0 = 0.1
+        theta_1 = 0.1
+        theta_2 = 0.8
+
+        X = [U[0]]  # 初始化序列
+        EX = [0]
+        for t in range(1, T):
+            X_t = (
+                theta_0 * X[t - 1]
+                + U[t]
+                + piecewise_function(U[t - 1], theta_1, theta_2)
+            )
+            X.append(X_t)
+            EX_t = theta_0 * X[t - 1] + piecewise_function(U[t - 1], theta_1, theta_2)
+            EX.append(EX_t)
+
+    elif func_type == "non-non_X":
+        U = np.random.randn(T)
+        # U = np.random.uniform(-1, 1, T) # 生成长度为T的均匀分布随机数
+        beta_0 = -0.2
+        beta_1 = 0.2
+        theta_0 = -0.2
+        theta_1 = 0.2
+        theta_2 = -0.2
+        theta_3 = 0.8
+        X = [U[0]]  # 初始化序列
+        EX = [0]
+        for t in range(1, T):
+            X_t = (
+                piecewise_function(X[t - 1], theta_0, theta_1)
+                + U[t]
+                + piecewise_function(U[t - 1], theta_2, theta_3)
+                + beta_0 * Z1[t]
+                + beta_0 * Z2[t]
+                + beta_0 * Z3[t]
+                + beta_1 * Z4[t]
+                + beta_1 * Z5[t]
+                + beta_1 * Z6[t]
+                + beta_1 * Z7[t]
+            )
+            X.append(X_t)
+            EX_t = (
+                piecewise_function(X[t - 1], theta_0, theta_1)
+                + piecewise_function(U[t - 1], theta_2, theta_3)
+                + beta_0 * Z1[t]
+                + beta_0 * Z2[t]
+                + beta_0 * Z3[t]
+                + beta_1 * Z4[t]
+                + beta_1 * Z5[t]
+                + beta_1 * Z6[t]
+                + beta_1 * Z7[t]
+            )
+            EX.append(EX_t)
+
+    elif func_type == "exp":
+        U = np.random.uniform(-1, 1, T)  # 生成长度为T的均匀分布随机数
+        theta_1 = 0.5
+        X = [U[0]]  # 初始化序列
+        EX = [0]
+        for t in range(1, T):
+            X_t = np.exp(-5 * X[t - 1] ** 2) + U[t] + theta_1 * U[t - 1]
+            X.append(X_t)
+            EX_t = np.exp(-5 * X[t - 1] ** 2) + theta_1 * U[t - 1]
+            EX.append(EX_t)
+
+    elif func_type == "FAR":
+        U = np.random.randn(T)
+        # U = np.random.uniform(-1, 1, T) # 生成长度为T的均匀分布随机数
+        a1 = a2 = 0
+        b1 = 1
+        b2 = 1
+        phi1 = 1
+        phi2 = 1
+        theta_1 = 0.5
+        theta_2 = 0.2
+        X = [U[0]]  # 初始化序列
+        X.append(U[1])
+        EX = [0, 0]
+        for t in range(2, T):
+            X_t = (
+                (a1 + b1 * np.exp(-phi1 * X[t - 1] ** 2)) * X[t - 1]
+                + (a2 + b2 * np.exp(-phi2 * X[t - 1] ** 2)) * X[t - 2]
+                + U[t]
+                + theta_1 * U[t - 1]
+                + theta_2 * U[t - 2]
+            )
+            X.append(X_t)
+            EX_t = (
+                (a1 + b1 * np.exp(-phi1 * X[t - 1] ** 2)) * X[t - 1]
+                + (a2 + b2 * np.exp(-phi2 * X[t - 1] ** 2)) * X[t - 2]
+                + theta_1 * U[t - 1]
+                + theta_2 * U[t - 2]
+            )
+            EX.append(EX_t)
+
+    elif func_type == "bilinear":
+        U = np.random.uniform(-1, 1, T)  # 生成长度为T的均匀分布随机数
+        theta_0 = 0.5
+        theta_1 = 0.5
+        theta_2 = 0.5
+        X = [U[0]]  # 初始化序列
+        EX = [0]
+        for t in range(1, T):
+            X_t = (
+                theta_0 * X[t - 1]
+                + U[t]
+                + theta_1 * U[t - 1]
+                + theta_2 * X[t - 1] * U[t - 1]
+            )
+            X.append(X_t)
+            EX_t = (
+                theta_0 * X[t - 1] + theta_1 * U[t - 1] + theta_2 * X[t - 1] * U[t - 1]
+            )
+            EX.append(EX_t)
+
+    elif func_type == "STAR":
+        U = np.random.uniform(-1, 1, T)  # 生成长度为T的均匀分布随机数
+        phi = 0.1
+        theta_1 = 0.5
+        theta_2 = 0.5
+        gamma = 20
+        c = 1
+
+        X = [U[0]]  # 初始化序列
+        EX = [0]
+        # G = [0]
+        for t in range(1, T):
+            # 计算平滑转换函数值
+            G_t = 1 / (1 + np.exp(-gamma * (X[t - 1] - c)))
+            # G.append(G_t)
+            X_t = phi * X[t - 1] + theta_1 * X[t - 1] * G_t + U[t] + theta_2 * U[t - 1]
+            X.append(X_t)
+            EX_t = phi * X[t - 1] + theta_1 * X[t - 1] * G_t + +theta_2 * U[t - 1]
+            EX.append(EX_t)
+
+    if covis:
+        X = np.array(X).reshape(-1, 1)  # 将 X 转换为列向量
+        Z1 = Z1.reshape(-1, 1)  # 将 Z1 转换为列向量
+        Z2 = Z2.reshape(-1, 1)  # 将 Z2 转换为列向量
+        Z3 = Z3.reshape(-1, 1)  # 将 Z3 转换为列向量
+        Z4 = Z4.reshape(-1, 1)  # 将 Z4 转换为列向量
+        Z5 = Z5.reshape(-1, 1)  # 将 Z5 转换为列向量
+        Z6 = Z6.reshape(-1, 1)  # 将 Z6 转换为列向量
+        Z7 = Z7.reshape(-1, 1)  # 将 Z7 转换为列向量
+        X = np.concatenate([X, Z1, Z2, Z3, Z4, Z5, Z6, Z7], axis=1)
+
+    return np.array(X), np.array(EX)
 
 
 def generate_arma_time_series(ar_params, ma_params, n_samples):
@@ -235,7 +437,7 @@ def train(
     """
     early_stopping = EarlyStopping(patience=5, verbose=True, path=checkpoint_path)
     best_val_loss = float("inf")  # Track the best validation loss
-
+    val_lst = []
     for epoch in range(epochs):
         model.train()
         train_loss = 0
@@ -315,11 +517,12 @@ def train(
                     dec_in = torch.cat(
                         [dec_in[:, 1:-1, :], target[:, step : step + 2, :]], dim=1
                     )
-                
+
                 loss = criterion(y_pred, target)
                 val_loss += loss.item()
         val_loss /= len(val_loader)
-
+        if epoch//5==0:
+            val_lst.append(val_loss)
         print(
             f"Epoch [{epoch + 1}/{epochs}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}"
         )
@@ -334,7 +537,7 @@ def train(
             model.load_state_dict(torch.load(checkpoint_path))
             break
 
-    return best_val_loss
+    return best_val_loss,val_lst
 
 
 def informer_predict(informer_len_combinations, data):
@@ -392,8 +595,8 @@ def informer_predict(informer_len_combinations, data):
 
             # Training setup
             criterion = torch.nn.MSELoss()
-            optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-            val_loss = train(
+            optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.0001)
+            val_loss,val_lst = train(
                 model,
                 train_loader,
                 val_loader,
@@ -410,10 +613,19 @@ def informer_predict(informer_len_combinations, data):
                 best_combination = (seq_len, label_len)
                 best_model = model  # Save model parameters
                 best_lr = lr
+                best_val_lst = val_lst
 
     print(
         f"Best Combination: seq_len: {best_combination[0]}, label_len: {best_combination[1]}, Val Loss: {best_val_loss:.4f}"
     )
+    # Plot the validation loss
+    plt.plot(best_val_lst)
+    plt.xlabel('Epoch')
+    plt.ylabel('Validation Loss')
+    plt.title('Validation Loss Over Epochs')
+
+    # Save the plot to a folder
+    plt.savefig(f'val_plots/validation_loss_plot_{seed}.png')
 
     # # Load the best model
     # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -822,21 +1034,25 @@ def main():
     result["seed"] = seed
 
     # Generate synthetic ARMA time series data
-    data = generate_arma_time_series(ar, ma, data_length)
+    data, EX = generatedata_ld(data_length, func_type="arma")
+    # data = generate_arma_time_series(ar, ma, data_length)
     # std = data.std()
-    true_value = data[-target_len:].tolist()
+    test_value = data[-target_len:].tolist()
+    true_value = EX[-target_len:].tolist()
     # result['STD'] = std
-    result["True"] = true_value
+    # result["True"] = true_value
 
     ###### ARMA Module ######
     arma_predictions = rolling_auto_arima(data=data, pred_len=target_len)
-    result["ARMA"] = arma_predictions
+    result["ARMA_mse"] = np.mean((arma_predictions - test_value) ** 2)
+    result["ARMA_mse_true"] = np.mean((arma_predictions - true_value) ** 2)
 
     ###### Informer Module ######
     informer_pred, informer_para, informer_lr = informer_predict(
         informer_len_combinations=informer_len, data=data
     )
-    result["Informer"] = informer_pred
+    result["Informer_mse"] = np.mean((informer_pred - test_value) ** 2)
+    result["Informer_mse_true"] = np.mean((informer_pred - true_value) ** 2)
     result["Informer_para"] = informer_para
     result["Informer_lr"] = informer_lr
     ###### RNN Module ######
@@ -871,8 +1087,7 @@ if __name__ == "__main__":
     # informer setting
     pred_len = 1
     informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
-    lr_lst = [0.00001,0.00001]
-
+    lr_lst = [0.00001, 0.00001]
 
     # informer_len = [(50, 10)]
     # lr_lst = [0.0001]
