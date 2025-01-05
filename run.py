@@ -840,15 +840,15 @@ def main():
     result["Informer_para"] = informer_para
     result["Informer_lr"] = informer_lr
     ###### RNN Module ######
-    train_len = data_length - target_len
-    train_split = int(train_len * 0.8)
-    train_data = data[:train_split]
-    val_data = data[train_split:train_len]
-    test_data = data[train_len:]
-    rnn_predictions = rnn_forecast(
-        train_data=train_data, val_data=val_data, test_data=test_data
-    )
-    result["RNN"] = rnn_predictions.tolist()
+    # train_len = data_length - target_len
+    # train_split = int(train_len * 0.8)
+    # train_data = data[:train_split]
+    # val_data = data[train_split:train_len]
+    # test_data = data[train_len:]
+    # rnn_predictions = rnn_forecast(
+    #     train_data=train_data, val_data=val_data, test_data=test_data
+    # )
+    # result["RNN"] = rnn_predictions.tolist()
 
     return result
 
@@ -871,7 +871,7 @@ if __name__ == "__main__":
     # informer setting
     pred_len = 1
     informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
-    lr_lst = [0.00001,0.000001]
+    lr_lst = [0.00001,0.00001]
 
 
     # informer_len = [(50, 10)]
