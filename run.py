@@ -1072,7 +1072,7 @@ def main():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Train and evaluate Informer on synthetic time series with ARMA benchmark."
-    )
+    ) #
     parser.add_argument(
         "integer", metavar="N", type=int, help="an integer for the accumulator"
     )
