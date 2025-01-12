@@ -625,7 +625,7 @@ def informer_predict(informer_len_combinations, data):
     plt.title('Validation Loss Over Epochs')
 
     # Save the plot to a folder
-    plt.savefig(f'val_plots/validation_loss_plot_{seed}.png')
+    plt.savefig(f'val_plots_midway/validation_loss_plot_{seed}.png')
 
     # # Load the best model
     # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -1044,15 +1044,15 @@ def main():
 
     ###### ARMA Module ######
     arma_predictions = rolling_auto_arima(data=data, pred_len=target_len)
-    result["ARMA_mse"] = np.mean((arma_predictions - test_value) ** 2)
-    result["ARMA_mse_true"] = np.mean((arma_predictions - true_value) ** 2)
+    result["ARMA_mse"] = np.mean((np.array(arma_predictions) - np.array(test_value)) ** 2)
+    result["ARMA_mse_true"] = np.mean((np.array(arma_predictions) - np.array(true_value)) ** 2)
 
     ###### Informer Module ######
     informer_pred, informer_para, informer_lr = informer_predict(
         informer_len_combinations=informer_len, data=data
     )
-    result["Informer_mse"] = np.mean((informer_pred - test_value) ** 2)
-    result["Informer_mse_true"] = np.mean((informer_pred - true_value) ** 2)
+    result["Informer_mse"] = np.mean((np.array(informer_pred) - np.array(test_value)) ** 2)
+    result["Informer_mse_true"] = np.mean((np.array(informer_pred) - np.array(true_value)) ** 2)
     result["Informer_para"] = informer_para
     result["Informer_lr"] = informer_lr
     ###### RNN Module ######
@@ -1086,14 +1086,14 @@ if __name__ == "__main__":
     ma = [1, 0.4]  # MA coefficients
     # informer setting
     pred_len = 1
-    informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
+    informer_len = [(10, 2), (20, 3), (50, 10), (100, 20)]
     lr_lst = [0.00001, 0.00001]
 
     # informer_len = [(50, 10)]
     # lr_lst = [0.0001]
     # 6 cancel iterate update model
     # 7 add tune
-    output_file = "csv_results_mercury/result_6.csv"
+    output_file = "csv_results/result_14.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
