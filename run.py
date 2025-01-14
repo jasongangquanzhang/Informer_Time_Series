@@ -521,8 +521,7 @@ def train(
                 loss = criterion(y_pred, target)
                 val_loss += loss.item()
         val_loss /= len(val_loader)
-        if epoch//5==0:
-            val_lst.append(val_loss)
+        val_lst.append(val_loss)
         print(
             f"Epoch [{epoch + 1}/{epochs}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}"
         )
@@ -536,7 +535,16 @@ def train(
             print("Early stopping triggered. Loading the best model...")
             model.load_state_dict(torch.load(checkpoint_path))
             break
-
+    # Plot the validation loss
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(1, len(val_lst) + 1), val_lst, marker='o', label="Validation Loss")
+    plt.title("Validation Loss Over Epochs")
+    plt.xlabel("Epoch")
+    plt.ylabel("Validation Loss")
+    plt.legend()
+    plt.grid()  
+    # Save the plot to a folder
+    plt.savefig(f'val_plots_midway/validation_loss_plot_{seed}.png')
     return best_val_loss,val_lst
 
 
@@ -618,14 +626,6 @@ def informer_predict(informer_len_combinations, data):
     print(
         f"Best Combination: seq_len: {best_combination[0]}, label_len: {best_combination[1]}, Val Loss: {best_val_loss:.4f}"
     )
-    # Plot the validation loss
-    plt.plot(best_val_lst)
-    plt.xlabel('Epoch')
-    plt.ylabel('Validation Loss')
-    plt.title('Validation Loss Over Epochs')
-
-    # Save the plot to a folder
-    plt.savefig(f'val_plots_midway/validation_loss_plot_{seed}.png')
 
     # # Load the best model
     # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -1040,19 +1040,19 @@ def main():
     test_value = data[-target_len:].tolist()
     true_value = EX[-target_len:].tolist()
     # result['STD'] = std
-    # result["True"] = true_value
+    result['Test'] = test_value
+    result["True"] = true_value
 
     ###### ARMA Module ######
     arma_predictions = rolling_auto_arima(data=data, pred_len=target_len)
-    result["ARMA_mse"] = np.mean((np.array(arma_predictions) - np.array(test_value)) ** 2)
-    result["ARMA_mse_true"] = np.mean((np.array(arma_predictions) - np.array(true_value)) ** 2)
+    result["ARMA"] = arma_predictions
+
 
     ###### Informer Module ######
     informer_pred, informer_para, informer_lr = informer_predict(
         informer_len_combinations=informer_len, data=data
     )
-    result["Informer_mse"] = np.mean((np.array(informer_pred) - np.array(test_value)) ** 2)
-    result["Informer_mse_true"] = np.mean((np.array(informer_pred) - np.array(true_value)) ** 2)
+    result["Informer"] = informer_pred
     result["Informer_para"] = informer_para
     result["Informer_lr"] = informer_lr
     ###### RNN Module ######
