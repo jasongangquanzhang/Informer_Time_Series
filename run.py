@@ -544,7 +544,7 @@ def train(
     plt.legend()
     plt.grid()  
     # Save the plot to a folder
-    plt.savefig(f'val_plots_midway/validation_loss_plot_{seed}.png')
+    plt.savefig(f'val_plots/validation_loss_plot_{seed}.png')
     return best_val_loss,val_lst
 
 
@@ -1086,14 +1086,14 @@ if __name__ == "__main__":
     ma = [1, 0.4]  # MA coefficients
     # informer setting
     pred_len = 1
-    informer_len = [(10, 2), (20, 3), (50, 10), (100, 20)]
-    lr_lst = [0.00001, 0.00001]
+    informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
+    lr_lst = [0.000001, 0.000001]
 
     # informer_len = [(50, 10)]
     # lr_lst = [0.0001]
     # 6 cancel iterate update model
     # 7 add tune
-    output_file = "csv_results/result_14.csv"
+    output_file = "csv_results_mercury/result_7.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
