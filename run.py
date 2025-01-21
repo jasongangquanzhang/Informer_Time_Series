@@ -535,16 +535,7 @@ def train(
             print("Early stopping triggered. Loading the best model...")
             model.load_state_dict(torch.load(checkpoint_path))
             break
-    # Plot the validation loss
-    plt.figure(figsize=(10, 6))
-    plt.plot(range(1, len(val_lst) + 1), val_lst, marker='o', label="Validation Loss")
-    plt.title("Validation Loss Over Epochs")
-    plt.xlabel("Epoch")
-    plt.ylabel("Validation Loss")
-    plt.legend()
-    plt.grid()  
-    # Save the plot to a folder
-    plt.savefig(f'val_plots/validation_loss_plot_{seed}.png')
+
     return best_val_loss,val_lst
 
 
@@ -626,6 +617,16 @@ def informer_predict(informer_len_combinations, data):
     print(
         f"Best Combination: seq_len: {best_combination[0]}, label_len: {best_combination[1]}, Val Loss: {best_val_loss:.4f}"
     )
+        # Plot the validation loss
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(1, len(val_lst) + 1), best_val_lst, marker='o', label="Validation Loss")
+    plt.title("Validation Loss Over Epochs")
+    plt.xlabel("Epoch")
+    plt.ylabel("Validation Loss")
+    plt.legend()
+    plt.grid()  
+    # Save the plot to a folder
+    plt.savefig(f'val_plots/validation_loss_plot_{seed}.png')
 
     # # Load the best model
     # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
