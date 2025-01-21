@@ -435,7 +435,7 @@ def train(
     """
     Train the model and return the final validation loss.
     """
-    early_stopping = EarlyStopping(patience=10, verbose=True, path=checkpoint_path)
+    early_stopping = EarlyStopping(patience=8, verbose=True, path=checkpoint_path)
     best_val_loss = float("inf")  # Track the best validation loss
     val_lst = []
     for epoch in range(epochs):
@@ -1087,13 +1087,13 @@ if __name__ == "__main__":
     # informer setting
     pred_len = 1
     informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
-    lr_lst = [0.000001, 0.000001]
+    lr_lst = [1e-7, 1e-8]
 
     # informer_len = [(50, 10)]
     # lr_lst = [0.0001]
     # 6 cancel iterate update model
     # 7 add tune
-    output_file = "csv_results_mercury/result_7.csv"
+    output_file = "csv_results_mercury/result_16.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
