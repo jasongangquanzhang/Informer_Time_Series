@@ -619,7 +619,7 @@ def informer_predict(informer_len_combinations, data):
     )
         # Plot the validation loss
     plt.figure(figsize=(10, 6))
-    plt.plot(range(1, len(val_lst) + 1), best_val_lst, marker='o', label="Validation Loss")
+    plt.plot(range(1, len(best_val_lst) + 1), best_val_lst, marker='o', label="Validation Loss")
     plt.title("Validation Loss Over Epochs")
     plt.xlabel("Epoch")
     plt.ylabel("Validation Loss")
@@ -1087,14 +1087,14 @@ if __name__ == "__main__":
     ma = [1, 0.4]  # MA coefficients
     # informer setting
     pred_len = 1
-    informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
+    informer_len = [(10, 2), (20, 4), (50, 10), (100, 20)]
     lr_lst = [1e-7, 1e-8]
 
     # informer_len = [(50, 10)]
     # lr_lst = [0.0001]
     # 6 cancel iterate update model
     # 7 add tune
-    output_file = "csv_results_mercury/result_16.csv"
+    output_file = "csv_results/result_16.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
