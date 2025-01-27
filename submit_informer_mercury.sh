@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --account=pi-dachxiu
 #SBATCH --mem=10G
-#SBATCH --time=2-00:00:00
+#SBATCH --time=2-18:00:00
 #SBATCH --job-name=informer_TS
-#SBATCH --partition=long
-#SBATCH --cpus-per-task=4
+#SBATCH --partition=standard
+#SBATCH --cpus-per-task=10
 #SBATCH --array=1-100
 
 module load python/booth/3.12

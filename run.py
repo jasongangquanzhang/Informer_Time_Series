@@ -576,7 +576,7 @@ def informer_predict(informer_len_combinations, data):
                 label_len=label_len,
                 out_len=pred_len,
                 factor=5,
-                d_model=512,
+                d_model=128,
                 n_heads=8,
                 e_layers=2,
                 d_layers=1,
@@ -1087,14 +1087,17 @@ if __name__ == "__main__":
     ma = [1, 0.4]  # MA coefficients
     # informer setting
     pred_len = 1
-    informer_len = [(10, 2), (20, 4), (50, 10), (100, 20)]
+    # mercury
+    # informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
+    # midway
+    # informer_len = [(10, 2), (20, 4), (50, 10), (100, 20)]
     lr_lst = [1e-7, 1e-8]
 
     # informer_len = [(50, 10)]
     # lr_lst = [0.0001]
     # 6 cancel iterate update model
     # 7 add tune
-    output_file = "csv_results/result_16.csv"
+    output_file = "csv_results_mercury/result_17.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
