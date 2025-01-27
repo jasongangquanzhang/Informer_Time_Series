@@ -576,11 +576,11 @@ def informer_predict(informer_len_combinations, data):
                 label_len=label_len,
                 out_len=pred_len,
                 factor=5,
-                d_model=128,
+                d_model=d_model,
                 n_heads=8,
                 e_layers=2,
                 d_layers=1,
-                d_ff=2048,
+                d_ff=d_ff,
                 dropout=0.05,
                 attn="prob",
                 embed="fixed",
@@ -1087,6 +1087,8 @@ if __name__ == "__main__":
     ma = [1, 0.4]  # MA coefficients
     # informer setting
     pred_len = 1
+    d_model = 128 # 512
+    d_ff=512 # 2048
     # mercury
     # informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
     # midway
