@@ -250,7 +250,7 @@ def generate_arma_time_series(ar_params, ma_params, n_samples):
 
 ###### ARMA Benchmark ######
 def rolling_auto_arima(
-    data, pred_len, information_criterion="bic", seasonal=False, max_order=(10, 2, 5)
+    data, pred_len, information_criterion="bic", seasonal=False, max_order=(10, 2, 10)
 ):
     """
     Perform rolling forecast using auto ARIMA to determine the best order.
@@ -294,7 +294,7 @@ def rolling_auto_arima(
             start_q = 0,
             max_p=max_order[0],
             d=0,  # Set differencing order to 0
-            max_q=0,  # Set max MA order to 0
+            max_q=max_order[2],  # Set max MA order to 0
             information_criterion=information_criterion,
             stepwise=True,
             suppress_warnings=True,
@@ -1109,7 +1109,7 @@ if __name__ == "__main__":
     # lr_lst = [0.0001]
     # 6 cancel iterate update model
     # 7 add tune
-    output_file = "csv_results_mercury/result_ar.csv"
+    output_file = "csv_results_mercury/result_arma.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
