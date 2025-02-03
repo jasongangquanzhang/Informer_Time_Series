@@ -250,7 +250,7 @@ def generate_arma_time_series(ar_params, ma_params, n_samples):
 
 ###### ARMA Benchmark ######
 def rolling_auto_arima(
-    data, pred_len, information_criterion="bic", seasonal=False, max_order=(5, 2, 5)
+    data, pred_len, information_criterion="bic", seasonal=False, max_order=(10, 2, 5)
 ):
     """
     Perform rolling forecast using auto ARIMA to determine the best order.
@@ -291,6 +291,7 @@ def rolling_auto_arima(
         arima_model = auto_arima(
             train,
             seasonal=seasonal,
+            start_q = 0,
             max_p=max_order[0],
             d=0,  # Set differencing order to 0
             max_q=0,  # Set max MA order to 0
@@ -313,7 +314,7 @@ def rolling_auto_arima(
         new_data = [data[train_len + i]]  # Only the current observed value
         arima_model.update(new_data)
 
-    return forecasts
+    return forecasts,arima_model.order
 
 
 class EarlyStopping:
@@ -1056,7 +1057,7 @@ def main():
 
     ###### ARMA Module ######
     arma_predictions = rolling_auto_arima(data=data, pred_len=target_len)
-    result["ARMA"] = arma_predictions
+    result["ARMA"],result["Order"] = arma_predictions
 
 
     ###### Informer Module ######
