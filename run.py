@@ -278,12 +278,22 @@ def rolling_auto_arima(
 
     # Use auto_arima to determine the best ARIMA order
     try:
+        # arima_model = auto_arima(
+        #     train,
+        #     seasonal=seasonal,
+        #     max_p=max_order[0],
+        #     max_d=max_order[1],
+        #     max_q=max_order[2],
+        #     information_criterion=information_criterion,
+        #     stepwise=True,
+        #     suppress_warnings=True,
+        # )
         arima_model = auto_arima(
             train,
             seasonal=seasonal,
             max_p=max_order[0],
-            max_d=max_order[1],
-            max_q=max_order[2],
+            d=0,  # Set differencing order to 0
+            max_q=0,  # Set max MA order to 0
             information_criterion=information_criterion,
             stepwise=True,
             suppress_warnings=True,
@@ -1050,12 +1060,12 @@ def main():
 
 
     ###### Informer Module ######
-    informer_pred, informer_para, informer_lr = informer_predict(
-        informer_len_combinations=informer_len, data=data
-    )
-    result["Informer"] = informer_pred
-    result["Informer_para"] = informer_para
-    result["Informer_lr"] = informer_lr
+    # informer_pred, informer_para, informer_lr = informer_predict(
+    #     informer_len_combinations=informer_len, data=data
+    # )
+    # result["Informer"] = informer_pred
+    # result["Informer_para"] = informer_para
+    # result["Informer_lr"] = informer_lr
     ###### RNN Module ######
     # train_len = data_length - target_len
     # train_split = int(train_len * 0.8)
@@ -1099,7 +1109,7 @@ if __name__ == "__main__":
     # lr_lst = [0.0001]
     # 6 cancel iterate update model
     # 7 add tune
-    output_file = "csv_results_mercury/result_17.csv"
+    output_file = "csv_results_mercury/result_ar.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
