@@ -1056,8 +1056,7 @@ def main():
     result["True"] = true_value
 
     ###### ARMA Module ######
-    arma_predictions = rolling_auto_arima(data=data, pred_len=target_len)
-    result["ARMA"],result["Order"] = arma_predictions
+    result["ARMA"],result["Order"] = rolling_auto_arima(data=data, pred_len=target_len)
 
 
     ###### Informer Module ######
