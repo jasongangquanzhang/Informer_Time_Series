@@ -67,6 +67,18 @@ def generatedata_ld(T, func_type, covis=False):
             EX_t = theta_0 * X[t - 1] + theta_1 * U[t - 1]
             EX.append(EX_t)
 
+    elif func_type == "ar":
+        U = np.random.uniform(-1, 1, T)  # 生成长度为T的均匀分布随机数
+        theta_0 = 0.5
+        theta_1 = 0.5
+        X = [U[0]]  # 初始化序列
+        EX = [0]
+        for t in range(1, T):
+            X_t = theta_0 * X[t - 1] + U[t] 
+            X.append(X_t)
+            EX_t = theta_0 * X[t - 1]
+            EX.append(EX_t)
+
     elif func_type == "lin-non1":
         U = np.random.uniform(-1, 1, T)  # 生成长度为T的均匀分布随机数
         theta_0 = 0.5
@@ -1060,12 +1072,12 @@ def main():
 
 
     ###### Informer Module ######
-    # informer_pred, informer_para, informer_lr = informer_predict(
-    #     informer_len_combinations=informer_len, data=data
-    # )
-    # result["Informer"] = informer_pred
-    # result["Informer_para"] = informer_para
-    # result["Informer_lr"] = informer_lr
+    informer_pred, informer_para, informer_lr = informer_predict(
+        informer_len_combinations=informer_len, data=data
+    )
+    result["Informer"] = informer_pred
+    result["Informer_para"] = informer_para
+    result["Informer_lr"] = informer_lr
     ###### RNN Module ######
     # train_len = data_length - target_len
     # train_split = int(train_len * 0.8)
@@ -1097,8 +1109,8 @@ if __name__ == "__main__":
     ma = [1, 0.4]  # MA coefficients
     # informer setting
     pred_len = 1
-    d_model = 128 # 512
-    d_ff=512 # 2048
+    d_model = 512 # 512
+    d_ff=2048 # 2048
     # mercury
     # informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
     # midway
@@ -1109,7 +1121,7 @@ if __name__ == "__main__":
     # lr_lst = [0.0001]
     # 6 cancel iterate update model
     # 7 add tune
-    output_file = "csv_results_mercury/result_arma.csv"
+    output_file = "csv_results/result_ar_1.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
