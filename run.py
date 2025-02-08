@@ -1058,7 +1058,7 @@ def main():
     result["seed"] = seed
 
     # Generate synthetic ARMA time series data
-    data, EX = generatedata_ld(data_length, func_type="arma")
+    data, EX = generatedata_ld(data_length, func_type="ar")
     # data = generate_arma_time_series(ar, ma, data_length)
     # std = data.std()
     test_value = data[-target_len:].tolist()
