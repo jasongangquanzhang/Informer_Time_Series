@@ -460,6 +460,7 @@ def train(
     """
     early_stopping = EarlyStopping(patience=8, verbose=True, path=checkpoint_path)
     best_val_loss = float("inf")  # Track the best validation loss
+    train_lst = []
     val_lst = []
     for epoch in range(epochs):
         model.train()
@@ -543,7 +544,9 @@ def train(
 
                 loss = criterion(y_pred, target)
                 val_loss += loss.item()
+            
         val_loss /= len(val_loader)
+        train_lst.append(train_loss)
         val_lst.append(val_loss)
         print(
             f"Epoch [{epoch + 1}/{epochs}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}"
@@ -559,7 +562,7 @@ def train(
             model.load_state_dict(torch.load(checkpoint_path))
             break
 
-    return best_val_loss,val_lst
+    return best_val_loss,train_lst,val_lst
 
 
 def informer_predict(informer_len_combinations, data):
@@ -618,7 +621,7 @@ def informer_predict(informer_len_combinations, data):
             # Training setup
             criterion = torch.nn.MSELoss()
             optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.0001)
-            val_loss,val_lst = train(
+            val_loss,train_lst,val_lst = train(
                 model,
                 train_loader,
                 val_loader,
@@ -635,21 +638,55 @@ def informer_predict(informer_len_combinations, data):
                 best_combination = (seq_len, label_len)
                 best_model = model  # Save model parameters
                 best_lr = lr
+                best_train_lst = train_lst
                 best_val_lst = val_lst
+                
 
     print(
         f"Best Combination: seq_len: {best_combination[0]}, label_len: {best_combination[1]}, Val Loss: {best_val_loss:.4f}"
     )
-        # Plot the validation loss
+    # # Plot the validation loss
+    # plt.figure(figsize=(10, 6))
+    # plt.plot(range(1, len(best_val_lst) + 1), best_val_lst, marker='o', label="Validation Loss")
+    # plt.title("Validation Loss Over Epochs")
+    # plt.xlabel("Epoch")
+    # plt.ylabel("Validation Loss")
+    # plt.legend()
+    # plt.grid()  
+    # # Save the plot to a folder
+    # plt.savefig(f'val_plots/validation_loss_plot_{seed}.png')
+    
+    # Find minimum losses
+    min_val_loss = min(best_val_lst)
+    min_train_loss = min(train_lst)
+
+    # Find epochs where minimum losses occur
+    min_val_epoch = best_val_lst.index(min_val_loss) + 1
+    min_train_epoch = train_lst.index(min_train_loss) + 1
+
+    # Plot training and validation loss
     plt.figure(figsize=(10, 6))
-    plt.plot(range(1, len(best_val_lst) + 1), best_val_lst, marker='o', label="Validation Loss")
-    plt.title("Validation Loss Over Epochs")
+    plt.plot(range(1, len(best_val_lst) + 1), best_val_lst, marker='o', label="Validation Loss", color='r')
+    plt.plot(range(1, len(train_lst) + 1), train_lst, marker='s', label="Training Loss", color='b')
+
+    # Mark minimum points
+    plt.scatter(min_val_epoch, min_val_loss, color='red', s=100, zorder=3, label=f"Min Val Loss: {min_val_loss:.4f}")
+    plt.scatter(min_train_epoch, min_train_loss, color='blue', s=100, zorder=3, label=f"Min Train Loss: {min_train_loss:.4f}")
+
+    # Add text annotations to show the exact loss values
+    plt.text(min_val_epoch, min_val_loss, f'{min_val_loss:.4f}', fontsize=12, verticalalignment='bottom', horizontalalignment='right', color='red')
+    plt.text(min_train_epoch, min_train_loss, f'{min_train_loss:.4f}', fontsize=12, verticalalignment='top', horizontalalignment='right', color='blue')
+
+    # Labels and title
+    plt.title("Training and Validation Loss Over Epochs")
     plt.xlabel("Epoch")
-    plt.ylabel("Validation Loss")
+    plt.ylabel("Loss")
     plt.legend()
-    plt.grid()  
-    # Save the plot to a folder
+    plt.grid()
+
+    # Save the plot
     plt.savefig(f'val_plots/validation_loss_plot_{seed}.png')
+    plt.show()
 
     # # Load the best model
     # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -1109,7 +1146,7 @@ if __name__ == "__main__":
     ma = [1, 0.4]  # MA coefficients
     # informer setting
     pred_len = 1
-    d_model = 512 # 512
+    d_model = 256 # 512
     d_ff=2048 # 2048
     # mercury
     # informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
