@@ -662,7 +662,7 @@ def informer_predict(informer_len_combinations, data):
 
     # Find epochs where minimum losses occur
     min_val_epoch = best_val_lst.index(min_val_loss) + 1
-    min_train_epoch = train_lst.index(min_train_loss) + 1
+    min_train_epoch = best_train_lst.index(min_train_loss) + 1
 
     # Plot training and validation loss
     plt.figure(figsize=(10, 6))
