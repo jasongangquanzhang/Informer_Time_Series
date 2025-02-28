@@ -404,10 +404,6 @@ def iterative_prediction_with_update(
     Perform iterative prediction and update the model with each new prediction and true value.
     """
     predictions = []
-    # optimizer = torch.optim.Adam(
-    #     model.parameters(), lr=0.0001
-    # )  # Use the same optimizer as during training
-    # criterion = torch.nn.MSELoss()  # Define the loss function
 
     for step in range(target_len):
         # Initialize encoder and decoder inputs
@@ -509,7 +505,7 @@ def train(
         model.eval()
         val_loss = 0
         with torch.no_grad():
-            for enc_input, dec_input, target in train_loader:
+            for enc_input, dec_input, target in val_loader:
                 enc_input, dec_input, target = (
                     enc_input.unsqueeze(-1).to(device),
                     dec_input.unsqueeze(-1).to(device),
@@ -620,7 +616,8 @@ def informer_predict(informer_len_combinations, data):
 
             # Training setup
             criterion = torch.nn.MSELoss()
-            optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.0001)
+            # optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.0001)
+            optimizer = torch.optim.Adam(model.parameters(), lr=lr)
             val_loss,train_lst,val_lst = train(
                 model,
                 train_loader,
@@ -658,7 +655,7 @@ def informer_predict(informer_len_combinations, data):
     
     # Find minimum losses
     min_val_loss = min(best_val_lst)
-    min_train_loss = min(train_lst)
+    min_train_loss = min(best_train_lst)
 
     # Find epochs where minimum losses occur
     min_val_epoch = best_val_lst.index(min_val_loss) + 1
@@ -1095,7 +1092,7 @@ def main():
     result["seed"] = seed
 
     # Generate synthetic ARMA time series data
-    data, EX = generatedata_ld(data_length, func_type="ar")
+    data, EX = generatedata_ld(data_length, func_type=func_type)
     # data = generate_arma_time_series(ar, ma, data_length)
     # std = data.std()
     test_value = data[-target_len:].tolist()
@@ -1138,6 +1135,7 @@ if __name__ == "__main__":
     )
     arg = parser.parse_args()
     seed = int(arg.integer)
+    func_type="arma"
     # Generate data
     data_length = 1000
     target_len = 10
@@ -1146,19 +1144,19 @@ if __name__ == "__main__":
     ma = [1, 0.4]  # MA coefficients
     # informer setting
     pred_len = 1
-    d_model = 256 # 512
+    d_model = 512 # 512
     d_ff=2048 # 2048
     # mercury
     # informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
     # midway
-    # informer_len = [(10, 2), (20, 4), (50, 10), (100, 20)]
-    lr_lst = [1e-7, 1e-8]
+    informer_len = [(10, 2), (20, 4), (50, 10)]
+    lr_lst = [1e-3]
 
     # informer_len = [(50, 10)]
     # lr_lst = [0.0001]
     # 6 cancel iterate update model
     # 7 add tune
-    output_file = "csv_results/result_ar_1.csv"
+    output_file = "csv_results/result_20.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
