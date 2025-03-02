@@ -468,6 +468,7 @@ def train(
                 dec_input.unsqueeze(-1).to(device),
                 target.unsqueeze(-1).to(device),
             )
+            optimizer.zero_grad()
             y_pred = None
             enc_in = enc_input
             dec_in = dec_input
@@ -540,8 +541,8 @@ def train(
 
                 loss = criterion(y_pred, target)
                 val_loss += loss.item()
-            
-        val_loss /= len(val_loader)
+            val_loss /= len(val_loader)
+        
         train_lst.append(train_loss)
         val_lst.append(val_loss)
         print(
@@ -1144,7 +1145,7 @@ if __name__ == "__main__":
     ma = [1, 0.4]  # MA coefficients
     # informer setting
     pred_len = 1
-    d_model = 512 # 512
+    d_model = 256 # 512
     d_ff=2048 # 2048
     # mercury
     # informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
@@ -1156,7 +1157,7 @@ if __name__ == "__main__":
     # lr_lst = [0.0001]
     # 6 cancel iterate update model
     # 7 add tune
-    output_file = "csv_results/result_20.csv"
+    output_file = "csv_results/result_24.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
