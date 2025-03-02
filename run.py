@@ -311,6 +311,10 @@ def rolling_auto_arima(
             stepwise=True,
             suppress_warnings=True,
         )
+        train_preds = arima_model.predict_in_sample()
+
+        # Compute RMSE and MAE
+        mse = mean_squared_error(train, train_preds)
         print(f"Selected Order: {arima_model.order}")
     except Exception as e:
         print(f"ARIMA model fitting failed: {e}")
@@ -326,7 +330,7 @@ def rolling_auto_arima(
         new_data = [data[train_len + i]]  # Only the current observed value
         arima_model.update(new_data)
 
-    return forecasts,arima_model.order
+    return forecasts,arima_model.order,mse
 
 
 class EarlyStopping:
@@ -643,17 +647,6 @@ def informer_predict(informer_len_combinations, data):
     print(
         f"Best Combination: seq_len: {best_combination[0]}, label_len: {best_combination[1]}, Val Loss: {best_val_loss:.4f}"
     )
-    # # Plot the validation loss
-    # plt.figure(figsize=(10, 6))
-    # plt.plot(range(1, len(best_val_lst) + 1), best_val_lst, marker='o', label="Validation Loss")
-    # plt.title("Validation Loss Over Epochs")
-    # plt.xlabel("Epoch")
-    # plt.ylabel("Validation Loss")
-    # plt.legend()
-    # plt.grid()  
-    # # Save the plot to a folder
-    # plt.savefig(f'val_plots/validation_loss_plot_{seed}.png')
-    
     # Find minimum losses
     min_val_loss = min(best_val_lst)
     min_train_loss = min(best_train_lst)
@@ -665,7 +658,7 @@ def informer_predict(informer_len_combinations, data):
     # Plot training and validation loss
     plt.figure(figsize=(10, 6))
     plt.plot(range(1, len(best_val_lst) + 1), best_val_lst, marker='o', label="Validation Loss", color='r')
-    plt.plot(range(1, len(train_lst) + 1), train_lst, marker='s', label="Training Loss", color='b')
+    plt.plot(range(1, len(best_train_lst) + 1), best_train_lst, marker='s', label="Training Loss", color='b')
 
     # Mark minimum points
     plt.scatter(min_val_epoch, min_val_loss, color='red', s=100, zorder=3, label=f"Min Val Loss: {min_val_loss:.4f}")
@@ -1103,7 +1096,7 @@ def main():
     result["True"] = true_value
 
     ###### ARMA Module ######
-    result["ARMA"],result["Order"] = rolling_auto_arima(data=data, pred_len=target_len)
+    result["ARMA"],result["Order"],result["ARMA_Train_loss"] = rolling_auto_arima(data=data, pred_len=target_len)
 
 
     ###### Informer Module ######
