@@ -608,7 +608,7 @@ def informer_predict(informer_len_combinations, data):
                 e_layers=2,
                 d_layers=1,
                 d_ff=d_ff,
-                dropout=0.1,
+                dropout=dropout,
                 attn="prob",
                 embed="fixed",
                 freq="h",
@@ -676,7 +676,7 @@ def informer_predict(informer_len_combinations, data):
     plt.grid()
 
     # Save the plot
-    plt.savefig(f'val_plots/validation_loss_plot_{seed}.png')
+    plt.savefig(f'{plot_dir}/validation_loss_plot_{seed}.png')
     plt.show()
 
     # # Load the best model
@@ -1140,17 +1140,22 @@ if __name__ == "__main__":
     pred_len = 1
     d_model = 128 # 512
     d_ff=2048 # 2048
+    dropout = 0.1
     # mercury
     # informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
     # midway
     informer_len = [(10, 2), (20, 4), (50, 10)]
-    lr_lst = [1e-3]
+    lr_lst = [1e-4]
 
     # informer_len = [(50, 10)]
     # lr_lst = [0.0001]
     # 6 cancel iterate update model
     # 7 add tune
-    output_file = "csv_results/result_24.csv"
+    num = 26
+    plot_dir = f"val_plots_{num}"
+    os.makedirs(plot_dir, exist_ok=True)
+
+    output_file = f"csv_results/result_{num}.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
