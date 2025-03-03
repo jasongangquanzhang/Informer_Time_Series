@@ -608,7 +608,7 @@ def informer_predict(informer_len_combinations, data):
                 e_layers=2,
                 d_layers=1,
                 d_ff=d_ff,
-                dropout=0.05,
+                dropout=0.1,
                 attn="prob",
                 embed="fixed",
                 freq="h",
@@ -621,8 +621,8 @@ def informer_predict(informer_len_combinations, data):
 
             # Training setup
             criterion = torch.nn.MSELoss()
-            # optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.0001)
-            optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+            optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.001)
+            # optimizer = torch.optim.Adam(model.parameters(), lr=lr)
             val_loss,train_lst,val_lst = train(
                 model,
                 train_loader,
