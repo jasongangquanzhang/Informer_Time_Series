@@ -1150,7 +1150,7 @@ if __name__ == "__main__":
     # lr_lst = [0.0001]
     # 6 cancel iterate update model
     # 7 add tune
-    output_file = "csv_results/result_24.csv"
+    output_file = "csv_results/result_26.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
