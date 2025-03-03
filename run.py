@@ -1138,7 +1138,7 @@ if __name__ == "__main__":
     ma = [1, 0.4]  # MA coefficients
     # informer setting
     pred_len = 1
-    d_model = 256 # 512
+    d_model = 128 # 512
     d_ff=2048 # 2048
     # mercury
     # informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
