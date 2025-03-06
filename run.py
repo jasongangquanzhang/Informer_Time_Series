@@ -81,7 +81,7 @@ def generatedata_ld(T, func_type, covis=False):
             EX.append(EX_t)
 
     elif func_type == "ma":
-        U = np.random.normal(0, 1, T)  # Generate white noise from a normal distribution
+        U = np.random.uniform(-1, 1, T)  # Generate white noise from a normal distribution
         X = [U[0]]  # Initialize the series with the first noise term
         theta_0 = 0.5
         theta_1 = 0.5
