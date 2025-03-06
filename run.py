@@ -19,6 +19,7 @@ from filelock import Timeout, FileLock
 from copy import deepcopy
 import matplotlib.pyplot as plt
 
+
 # Set up random seed
 def set_seed(seed):
     random.seed(seed)
@@ -74,7 +75,7 @@ def generatedata_ld(T, func_type, covis=False):
         X = [U[0]]  # 初始化序列
         EX = [0]
         for t in range(1, T):
-            X_t = theta_0 * X[t - 1] + U[t] 
+            X_t = theta_0 * X[t - 1] + U[t]
             X.append(X_t)
             EX_t = theta_0 * X[t - 1]
             EX.append(EX_t)
@@ -303,7 +304,7 @@ def rolling_auto_arima(
         arima_model = auto_arima(
             train,
             seasonal=seasonal,
-            start_q = 0,
+            start_q=0,
             max_p=max_order[0],
             d=0,  # Set differencing order to 0
             max_q=max_order[2],  # Set max MA order to 0
@@ -330,7 +331,7 @@ def rolling_auto_arima(
         new_data = [data[train_len + i]]  # Only the current observed value
         arima_model.update(new_data)
 
-    return forecasts,arima_model.order,mse
+    return forecasts, arima_model.order, mse
 
 
 class EarlyStopping:
@@ -407,39 +408,36 @@ def iterative_prediction_with_update(
     """
     Perform iterative prediction and update the model with each new prediction and true value.
     """
+
     predictions = []
-
-    for step in range(target_len):
-        # Initialize encoder and decoder inputs
-        enc_in = (
-            torch.tensor(test_data[step : step + seq_len], dtype=torch.float32)
-            .unsqueeze(0)
-            .unsqueeze(-1)
-            .to(device)
-        )
-        dec_in = (
-            torch.tensor(
-                test_data[step + seq_len - label_len : step + seq_len + pred_len],
-                dtype=torch.float32,
+    # Make a prediction
+    model.eval()
+    with torch.no_grad():
+        for step in range(target_len):
+            # Initialize encoder and decoder inputs
+            enc_in = (
+                torch.tensor(test_data[step : step + seq_len], dtype=torch.float32)
+                .unsqueeze(0)
+                .unsqueeze(-1)
+                .to(device)
             )
-            .unsqueeze(0)
-            .unsqueeze(-1)
-            .to(device)
-        )
-
-        # Set the last point of decoder input to 0
-
-        dec_in[:, -1, :] = 0
-
-        # Make a prediction
-        model.eval()
-        with torch.no_grad():
+            dec_in = (
+                torch.tensor(
+                    test_data[step + seq_len - label_len : step + seq_len + pred_len],
+                    dtype=torch.float32,
+                )
+                .unsqueeze(0)
+                .unsqueeze(-1)
+                .to(device)
+            )
+            # Set the last point of decoder input to 0
+            dec_in[:, -1, :] = 0
             pred = (
                 model(enc_in, enc_in, dec_in, dec_in).squeeze(-1).cpu().numpy()[0, -1]
             )
 
-        # Append prediction and true value to the results
-        predictions.append(pred)
+            # Append prediction and true value to the results
+            predictions.append(pred)
 
     return predictions
 
@@ -546,34 +544,33 @@ def train(
                 loss = criterion(y_pred, target)
                 val_loss += loss.item()
             val_loss /= len(val_loader)
-        
+
         train_lst.append(train_loss)
         val_lst.append(val_loss)
         print(
             f"Epoch [{epoch + 1}/{epochs}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}"
         )
 
-        # Check early stopping
-        early_stopping(val_loss, model)
+        # Save the best model
         if val_loss < best_val_loss:
-            best_val_loss = val_loss  # Update best validation loss
+            best_val_loss = val_loss
+            best_model_state = deepcopy(model.state_dict())
 
+        early_stopping(val_loss, model=model)
         if early_stopping.early_stop:
-            print("Early stopping triggered. Loading the best model...")
-            model.load_state_dict(torch.load(checkpoint_path))
+            print("Early stopping")
             break
 
-    return best_val_loss,train_lst,val_lst
+    # Load the best model
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state)
+    return best_val_loss, train_lst, val_lst
 
 
 def informer_predict(informer_len_combinations, data):
     """
     Perform grid search over seq_len and label_len combinations to choose the best one based on validation loss.
     """
-    train_len = len(data) - target_len
-    train_split = int(train_len * 0.8)
-    train_data = data[:train_split]
-    val_data = data[train_split:train_len]
 
     best_val_loss = float("inf")
     best_combination = None
@@ -581,16 +578,21 @@ def informer_predict(informer_len_combinations, data):
 
     # Iterate over all seq_len and label_len combinations
     for seq_len, label_len in informer_len_combinations:
+        train_len = len(data) - seq_len - target_len
+        train_split = int(train_len * 0.7)
+        train_data = data[:train_split]
+        val_data = data[train_split:train_len]
+        # Prepare datasets and loaders
+        train_dataset = TimeSeriesDataset(
+            train_data, seq_len, label_len, pred_len, target_len=target_len
+        )
+        val_dataset = TimeSeriesDataset(
+            val_data, seq_len, label_len, pred_len, target_len=target_len
+        )
+        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+
         for lr in lr_lst:
-            # Prepare datasets and loaders
-            train_dataset = TimeSeriesDataset(
-                train_data, seq_len, label_len, pred_len, target_len=target_len
-            )
-            val_dataset = TimeSeriesDataset(
-                val_data, seq_len, label_len, pred_len, target_len=target_len
-            )
-            train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-            val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
             # Model setup
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -623,7 +625,7 @@ def informer_predict(informer_len_combinations, data):
             criterion = torch.nn.MSELoss()
             optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.001)
             # optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-            val_loss,train_lst,val_lst = train(
+            val_loss, train_lst, val_lst = train(
                 model,
                 train_loader,
                 val_loader,
@@ -642,11 +644,11 @@ def informer_predict(informer_len_combinations, data):
                 best_lr = lr
                 best_train_lst = train_lst
                 best_val_lst = val_lst
-                
 
     print(
         f"Best Combination: seq_len: {best_combination[0]}, label_len: {best_combination[1]}, Val Loss: {best_val_loss:.4f}"
     )
+
     # Find minimum losses
     min_val_loss = min(best_val_lst)
     min_train_loss = min(best_train_lst)
@@ -657,16 +659,58 @@ def informer_predict(informer_len_combinations, data):
 
     # Plot training and validation loss
     plt.figure(figsize=(10, 6))
-    plt.plot(range(1, len(best_val_lst) + 1), best_val_lst, marker='o', label="Validation Loss", color='r')
-    plt.plot(range(1, len(best_train_lst) + 1), best_train_lst, marker='s', label="Training Loss", color='b')
+    plt.plot(
+        range(1, len(best_val_lst) + 1),
+        best_val_lst,
+        marker="o",
+        label="Validation Loss",
+        color="r",
+    )
+    plt.plot(
+        range(1, len(best_train_lst) + 1),
+        best_train_lst,
+        marker="s",
+        label="Training Loss",
+        color="b",
+    )
 
     # Mark minimum points
-    plt.scatter(min_val_epoch, min_val_loss, color='red', s=100, zorder=3, label=f"Min Val Loss: {min_val_loss:.4f}")
-    plt.scatter(min_train_epoch, min_train_loss, color='blue', s=100, zorder=3, label=f"Min Train Loss: {min_train_loss:.4f}")
+    plt.scatter(
+        min_val_epoch,
+        min_val_loss,
+        color="red",
+        s=100,
+        zorder=3,
+        label=f"Min Val Loss: {min_val_loss:.4f}",
+    )
+    plt.scatter(
+        min_train_epoch,
+        min_train_loss,
+        color="blue",
+        s=100,
+        zorder=3,
+        label=f"Min Train Loss: {min_train_loss:.4f}",
+    )
 
     # Add text annotations to show the exact loss values
-    plt.text(min_val_epoch, min_val_loss, f'{min_val_loss:.4f}', fontsize=12, verticalalignment='bottom', horizontalalignment='right', color='red')
-    plt.text(min_train_epoch, min_train_loss, f'{min_train_loss:.4f}', fontsize=12, verticalalignment='top', horizontalalignment='right', color='blue')
+    plt.text(
+        min_val_epoch,
+        min_val_loss,
+        f"{min_val_loss:.4f}",
+        fontsize=12,
+        verticalalignment="bottom",
+        horizontalalignment="right",
+        color="red",
+    )
+    plt.text(
+        min_train_epoch,
+        min_train_loss,
+        f"{min_train_loss:.4f}",
+        fontsize=12,
+        verticalalignment="top",
+        horizontalalignment="right",
+        color="blue",
+    )
 
     # Labels and title
     plt.title("Training and Validation Loss Over Epochs")
@@ -676,7 +720,7 @@ def informer_predict(informer_len_combinations, data):
     plt.grid()
 
     # Save the plot
-    plt.savefig(f'{plot_dir}/validation_loss_plot_{seed}.png')
+    plt.savefig(f"{plot_dir}/validation_loss_plot_{seed}.png")
     plt.show()
 
     # # Load the best model
@@ -709,7 +753,7 @@ def informer_predict(informer_len_combinations, data):
     # Perform iterative prediction using the best model
     informer_predictions = iterative_prediction_with_update(
         best_model,
-        data[train_len - seq_len :],
+        data[len(data) - best_combination[0] - target_len :],
         best_combination[0],
         best_combination[1],
         pred_len,
@@ -1092,12 +1136,13 @@ def main():
     test_value = data[-target_len:].tolist()
     true_value = EX[-target_len:].tolist()
     # result['STD'] = std
-    result['Test'] = test_value
+    result["Test"] = test_value
     result["True"] = true_value
 
     ###### ARMA Module ######
-    result["ARMA"],result["Order"],result["ARMA_Train_loss"] = rolling_auto_arima(data=data, pred_len=target_len)
-
+    result["ARMA"], result["Order"], result["ARMA_Train_loss"] = rolling_auto_arima(
+        data=data, pred_len=target_len
+    )
 
     ###### Informer Module ######
     informer_pred, informer_para, informer_lr = informer_predict(
@@ -1123,13 +1168,13 @@ def main():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Train and evaluate Informer on synthetic time series with ARMA benchmark."
-    ) #
+    )  #
     parser.add_argument(
         "integer", metavar="N", type=int, help="an integer for the accumulator"
     )
     arg = parser.parse_args()
     seed = int(arg.integer)
-    func_type="arma"
+    func_type = "arma"
     # Generate data
     data_length = 1000
     target_len = 10
@@ -1138,9 +1183,9 @@ if __name__ == "__main__":
     ma = [1, 0.4]  # MA coefficients
     # informer setting
     pred_len = 1
-    d_model = 128 # 512
-    d_ff=2048 # 2048
-    dropout = 0.1
+    d_model = 64  # 512
+    d_ff = 512  # 2048
+    dropout = 0.2
     # mercury
     # informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
     # midway
@@ -1151,7 +1196,7 @@ if __name__ == "__main__":
     # lr_lst = [0.0001]
     # 6 cancel iterate update model
     # 7 add tune
-    num = 26
+    num = 28
     plot_dir = f"val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
