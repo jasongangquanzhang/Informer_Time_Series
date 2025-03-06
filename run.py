@@ -281,12 +281,13 @@ def rolling_auto_arima(
     """
     # Ensure data is a NumPy array
     data = np.asarray(data)
-
-    # Calculate training length
     train_len = len(data) - pred_len
+    # Calculate training length
+    train_split = int(train_len * 0.7)
 
     # Split data into training and test sets
-    train = data[:train_len]
+    train = data[:train_split]
+    valid = data[train_split:train_len]
     forecasts = []
 
     # Use auto_arima to determine the best ARIMA order
@@ -313,25 +314,29 @@ def rolling_auto_arima(
             suppress_warnings=True,
         )
         train_preds = arima_model.predict_in_sample()
+        valid_preds = arima_model.predict(n_periods=len(valid)) 
+        
 
         # Compute RMSE and MAE
-        mse = mean_squared_error(train, train_preds)
+        # Compute training and validation MSE
+        train_mse = mean_squared_error(train, train_preds)
+        valid_mse = mean_squared_error(valid, valid_preds)
         print(f"Selected Order: {arima_model.order}")
     except Exception as e:
         print(f"ARIMA model fitting failed: {e}")
         sys.exit(-1)
-
+        
     # Perform rolling forecast
     for i in range(pred_len):
         # Forecast the next value
-        forecast = arima_model.predict(n_periods=1)[0]
+        forecast = arima_model.predict(n_periods=1,X=data[:train_len])[0]
         forecasts.append(forecast)
 
         # Update the model with the latest observed value
         new_data = [data[train_len + i]]  # Only the current observed value
         arima_model.update(new_data)
 
-    return forecasts, arima_model.order, mse
+    return forecasts, arima_model.order, train_mse, valid_mse
 
 
 class EarlyStopping:
@@ -1140,7 +1145,7 @@ def main():
     result["True"] = true_value
 
     ###### ARMA Module ######
-    result["ARMA"], result["Order"], result["ARMA_Train_loss"] = rolling_auto_arima(
+    result["ARMA"], result["Order"], result["ARMA_Train_loss"], result["ARMA_Valid_loss"]= rolling_auto_arima(
         data=data, pred_len=target_len
     )
 
