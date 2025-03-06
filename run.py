@@ -80,6 +80,18 @@ def generatedata_ld(T, func_type, covis=False):
             EX_t = theta_0 * X[t - 1]
             EX.append(EX_t)
 
+    elif func_type == "ma":
+        U = np.random.normal(0, 1, T)  # Generate white noise from a normal distribution
+        X = [U[0]]  # Initialize the series with the first noise term
+        theta_0 = 0.5
+        theta_1 = 0.5
+        EX = [0]
+        for t in range(1, T):
+            X_t = U[t] + theta_1 * U[t - 1]
+            X.append(X_t)
+            EX_t = theta_1 * U[t - 1]  # E[X_t] given past noise
+            EX.append(EX_t)
+
     elif func_type == "lin-non1":
         U = np.random.uniform(-1, 1, T)  # 生成长度为T的均匀分布随机数
         theta_0 = 0.5
@@ -314,8 +326,7 @@ def rolling_auto_arima(
             suppress_warnings=True,
         )
         train_preds = arima_model.predict_in_sample()
-        valid_preds = arima_model.predict(n_periods=len(valid)) 
-        
+        valid_preds = arima_model.predict(n_periods=len(valid))
 
         # Compute RMSE and MAE
         # Compute training and validation MSE
@@ -586,7 +597,7 @@ def informer_predict(informer_len_combinations, data):
     # Iterate over all seq_len and label_len combinations
     for seq_len, label_len in informer_len_combinations:
         train_len = len(data) - seq_len - target_len
-        train_split = int(train_len * 0.7)
+        train_split = int(train_len * 0.8)
         train_data = data[:train_split]
         val_data = data[train_split:train_len]
         # Prepare datasets and loaders
@@ -1147,9 +1158,12 @@ def main():
     result["True"] = true_value
 
     ###### ARMA Module ######
-    result["ARMA"], result["Order"], result["ARMA_Train_loss"], result["ARMA_Valid_loss"]= rolling_auto_arima(
-        data=data, pred_len=target_len
-    )
+    (
+        result["ARMA"],
+        result["Order"],
+        result["ARMA_Train_loss"],
+        result["ARMA_Valid_loss"],
+    ) = rolling_auto_arima(data=data, pred_len=target_len)
 
     ###### Informer Module ######
     informer_pred, informer_para, informer_lr = informer_predict(
@@ -1159,15 +1173,15 @@ def main():
     result["Informer_para"] = informer_para
     result["Informer_lr"] = informer_lr
     ###### RNN Module ######
-    # train_len = data_length - target_len
-    # train_split = int(train_len * 0.8)
-    # train_data = data[:train_split]
-    # val_data = data[train_split:train_len]
-    # test_data = data[train_len:]
-    # rnn_predictions = rnn_forecast(
-    #     train_data=train_data, val_data=val_data, test_data=test_data
-    # )
-    # result["RNN"] = rnn_predictions.tolist()
+    train_len = data_length - target_len
+    train_split = int(train_len * 0.8)
+    train_data = data[:train_split]
+    val_data = data[train_split:train_len]
+    test_data = data[train_len:]
+    rnn_predictions = rnn_forecast(
+        train_data=train_data, val_data=val_data, test_data=test_data
+    )
+    result["RNN"] = rnn_predictions.tolist()
 
     return result
 
@@ -1181,13 +1195,13 @@ if __name__ == "__main__":
     )
     arg = parser.parse_args()
     seed = int(arg.integer)
-    func_type = "arma"
+    func_type = "ma"
     # Generate data
     data_length = 1000
     target_len = 10
     # Parameters for ARMA(2,1) process
-    ar = [1, -0.5, 0.25]  # AR coefficients
-    ma = [1, 0.4]  # MA coefficients
+    # ar = [1, -0.5, 0.25]  # AR coefficients
+    # ma = [1, 0.4]  # MA coefficients
     # informer setting
     pred_len = 1
     d_model = 64  # 512
@@ -1203,7 +1217,7 @@ if __name__ == "__main__":
     # lr_lst = [0.0001]
     # 6 cancel iterate update model
     # 7 add tune
-    num = 28
+    num = 29
     plot_dir = f"val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
