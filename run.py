@@ -325,11 +325,13 @@ def rolling_auto_arima(
     except Exception as e:
         print(f"ARIMA model fitting failed: {e}")
         sys.exit(-1)
-        
+    for i in range(len(valid)):
+        arima_model.update([valid[i]])  # Update model step-by-step
+
     # Perform rolling forecast
     for i in range(pred_len):
         # Forecast the next value
-        forecast = arima_model.predict(n_periods=1,X=data[:train_len])[0]
+        forecast = arima_model.predict(n_periods=1)[0]
         forecasts.append(forecast)
 
         # Update the model with the latest observed value
