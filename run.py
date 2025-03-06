@@ -304,16 +304,6 @@ def rolling_auto_arima(
 
     # Use auto_arima to determine the best ARIMA order
     try:
-        # arima_model = auto_arima(
-        #     train,
-        #     seasonal=seasonal,
-        #     max_p=max_order[0],
-        #     max_d=max_order[1],
-        #     max_q=max_order[2],
-        #     information_criterion=information_criterion,
-        #     stepwise=True,
-        #     suppress_warnings=True,
-        # )
         arima_model = auto_arima(
             train,
             seasonal=seasonal,
@@ -740,33 +730,6 @@ def informer_predict(informer_len_combinations, data):
     # Save the plot
     plt.savefig(f"{plot_dir}/validation_loss_plot_{seed}.png")
     plt.show()
-
-    # # Load the best model
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # model = Informer(
-    #     enc_in=1,
-    #     dec_in=1,
-    #     c_out=1,
-    #     seq_len=best_combination[0],
-    #     label_len=best_combination[1],
-    #     out_len=pred_len,
-    #     factor=5,
-    #     d_model=512,
-    #     n_heads=8,
-    #     e_layers=2,
-    #     d_layers=1,
-    #     d_ff=2048,
-    #     dropout=0.05,
-    #     attn="prob",
-    #     embed="fixed",
-    #     freq="h",
-    #     activation="gelu",
-    #     output_attention=False,
-    #     distil=True,
-    #     mix=True,
-    #     device=device,
-    # ).to(device)
-    # model.load_state_dict(best_model)
 
     # Perform iterative prediction using the best model
     informer_predictions = iterative_prediction_with_update(
@@ -1212,11 +1175,6 @@ if __name__ == "__main__":
     # midway
     informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4]
-
-    # informer_len = [(50, 10)]
-    # lr_lst = [0.0001]
-    # 6 cancel iterate update model
-    # 7 add tune
     num = 29
     plot_dir = f"val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
