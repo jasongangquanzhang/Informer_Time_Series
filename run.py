@@ -1183,7 +1183,7 @@ def main():
     ###### ARMA Module ######
     (
         result["ARMA"],
-        result["Order"],
+        result["ARMA_Order"],
         result["ARMA_Train_loss"],
         result["ARMA_Valid_loss"],
     ) = rolling_auto_arima(data=data, pred_len=target_len)
