@@ -272,9 +272,8 @@ def generate_arma_time_series(ar_params, ma_params, n_samples):
     time_series = arma_process.generate_sample(nsample=n_samples)
     return time_series
 
-
-###### ARMA Benchmark ######
-def rolling_auto_arima(
+# AR
+def rolling_auto_ar(
     data, pred_len, information_criterion="bic", seasonal=False, max_order=(10, 2, 10)
 ):
     """
@@ -295,7 +294,68 @@ def rolling_auto_arima(
     data = np.asarray(data)
     train_len = len(data) - pred_len
     # Calculate training length
-    train_split = int(train_len * 0.7)
+    train_split = int(train_len * 0.8)
+
+    # Split data into training and test sets
+    train = data[:train_split]
+    valid = data[train_split:train_len]
+    forecasts = []
+
+    # Use auto_arima to determine the best ARIMA order
+    try:
+        arima_model = auto_arima(
+            train,
+            seasonal=seasonal,
+            start_q=0,
+            max_p=max_order[0],
+            d=0,  # Set differencing order to 0
+            max_q=max_order[2],  # Set max MA order to 0
+            information_criterion=information_criterion,
+            stepwise=True,
+            suppress_warnings=True,
+        )
+        print(f"Selected Order: {arima_model.order}")
+    except Exception as e:
+        print(f"ARIMA model fitting failed: {e}")
+        sys.exit(-1)
+    for i in range(len(valid)):
+        arima_model.update([valid[i]])  # Update model step-by-step
+
+    # Perform rolling forecast
+    for i in range(pred_len):
+        # Forecast the next value
+        forecast = arima_model.predict(n_periods=1)[0]
+        forecasts.append(forecast)
+
+        # Update the model with the latest observed value
+        new_data = [data[train_len + i]]  # Only the current observed value
+        arima_model.update(new_data)
+
+    return forecasts, arima_model.order
+
+###### ARMA Benchmark ######
+def rolling_auto_arima(
+    data, pred_len, information_criterion="bic", seasonal=False, max_order=(20, 2, 20)
+):
+    """
+    Perform rolling forecast using auto ARIMA to determine the best order.
+    The model updates only with the latest observed value.
+
+    Parameters:
+        data (array-like): Univariate time series data.
+        pred_len (int): Number of data points to predict iteratively.
+        seasonal (bool): Whether to fit a seasonal ARIMA model.
+        max_order (tuple): Maximum (p, d, q) values for order search.
+
+    Returns:
+        forecasts (list): List of predicted values.
+        mse (float): Mean Squared Error of the predictions.
+    """
+    # Ensure data is a NumPy array
+    data = np.asarray(data)
+    train_len = len(data) - pred_len
+    # Calculate training length
+    train_split = int(train_len * 0.8)
 
     # Split data into training and test sets
     train = data[:train_split]
@@ -1127,6 +1187,8 @@ def main():
         result["ARMA_Train_loss"],
         result["ARMA_Valid_loss"],
     ) = rolling_auto_arima(data=data, pred_len=target_len)
+    
+    result["AR"],result["AR_Order"] = rolling_auto_ar(data=data,pred_len=target_len,max_order=(20,2,0))
 
     ###### Informer Module ######
     informer_pred, informer_para, informer_lr = informer_predict(
@@ -1158,7 +1220,7 @@ if __name__ == "__main__":
     )
     arg = parser.parse_args()
     seed = int(arg.integer)
-    func_type = "ma"
+    func_type = "arma"
     # Generate data
     data_length = 1000
     target_len = 10
@@ -1171,11 +1233,11 @@ if __name__ == "__main__":
     d_ff = 512  # 2048
     dropout = 0.2
     # mercury
-    # informer_len = [(10, 5), (20, 10), (50, 20), (100, 50)]
+    informer_len = [(10, 5), (20, 10), (50, 20)]
     # midway
-    informer_len = [(10, 2), (20, 4), (50, 10)]
+    # informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4]
-    num = 29
+    num = 30
     plot_dir = f"val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
