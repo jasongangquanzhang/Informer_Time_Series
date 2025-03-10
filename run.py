@@ -127,8 +127,8 @@ def generatedata_ld(T, func_type, covis=False):
         # U = np.random.uniform(-1, 1, T) # 生成长度为T的均匀分布随机数
         beta_0 = -0.2
         beta_1 = 0.2
-        theta_0 = -0.2
-        theta_1 = 0.2
+        theta_0 = 0.2
+        theta_1 = -0.2
         theta_2 = -0.2
         theta_3 = 0.8
         X = [U[0]]  # 初始化序列
@@ -1165,10 +1165,7 @@ def rnn_forecast(train_data, val_data, test_data):
 
 
 # Main function
-def main():
-    set_seed(seed)
-    result = {}
-    result["seed"] = seed
+def main(result,func_type):
 
     # Generate synthetic ARMA time series data
     data, EX = generatedata_ld(data_length, func_type=func_type)
@@ -1177,26 +1174,27 @@ def main():
     test_value = data[-target_len:].tolist()
     true_value = EX[-target_len:].tolist()
     # result['STD'] = std
-    result["Test"] = test_value
-    result["True"] = true_value
+    result[f"{func_type}_Test"] = test_value
+    result[f"{func_type}_True"] = true_value
 
     ###### ARMA Module ######
     (
-        result["ARMA"],
-        result["ARMA_Order"],
-        result["ARMA_Train_loss"],
-        result["ARMA_Valid_loss"],
+        result[f"{func_type}_ARMA"],
+        *_
+        # result["ARMA_Order"],
+        # result["ARMA_Train_loss"],
+        # result["ARMA_Valid_loss"],
     ) = rolling_auto_arima(data=data, pred_len=target_len)
     
-    result["AR"],result["AR_Order"] = rolling_auto_ar(data=data,pred_len=target_len,max_order=(20,2,0))
+    result[f"{func_type}_AR"],*_ = rolling_auto_ar(data=data,pred_len=target_len,max_order=(20,2,0))
 
     ###### Informer Module ######
     informer_pred, informer_para, informer_lr = informer_predict(
         informer_len_combinations=informer_len, data=data
     )
-    result["Informer"] = informer_pred
-    result["Informer_para"] = informer_para
-    result["Informer_lr"] = informer_lr
+    result[f"{func_type}_Informer"] = informer_pred
+    result[f"{func_type}_Informer_para"] = informer_para
+    result[f"{func_type}_Informer_lr"] = informer_lr
     ###### RNN Module ######
     train_len = data_length - target_len
     train_split = int(train_len * 0.8)
@@ -1206,9 +1204,9 @@ def main():
     rnn_predictions = rnn_forecast(
         train_data=train_data, val_data=val_data, test_data=test_data
     )
-    result["RNN"] = rnn_predictions.tolist()
+    result[f"{func_type}_RNN"] = rnn_predictions.tolist()
 
-    return result
+    return
 
 
 if __name__ == "__main__":
@@ -1220,7 +1218,8 @@ if __name__ == "__main__":
     )
     arg = parser.parse_args()
     seed = int(arg.integer)
-    func_type = "arma"
+    func_type_lst = ["arma","FAR","bilinear","lin-non1","STAR","non-non_X"]
+    # func_type = 
     # Generate data
     data_length = 1000
     target_len = 10
@@ -1233,20 +1232,23 @@ if __name__ == "__main__":
     d_ff = 512  # 2048
     dropout = 0.2
     # mercury
-    informer_len = [(10, 5), (20, 10), (50, 20)]
+    # informer_len = [(10, 5), (20, 10), (50, 20)]
     # midway
-    # informer_len = [(10, 2), (20, 4), (50, 10)]
+    informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4]
-    num = 30
+    num = 31
     plot_dir = f"val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
     output_file = f"csv_results/result_{num}.csv"
+    set_seed(seed)
+    result = {"seed": seed}
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
     checkpoint_path = os.path.join(checkpoint_dir, f"best_model_seed_{seed}.pth")
-    result = main()
+    for func_type in func_type_lst:
+        result = main(func_type)
 
     with FileLock(output_file + ".lock"):
         if os.path.exists(output_file):
