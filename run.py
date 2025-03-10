@@ -1206,7 +1206,7 @@ def main(result,func_type):
     )
     result[f"{func_type}_RNN"] = rnn_predictions.tolist()
 
-    return
+    return result
 
 
 if __name__ == "__main__":
