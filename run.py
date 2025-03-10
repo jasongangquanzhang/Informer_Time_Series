@@ -1248,7 +1248,7 @@ if __name__ == "__main__":
     os.makedirs(checkpoint_dir, exist_ok=True)
     checkpoint_path = os.path.join(checkpoint_dir, f"best_model_seed_{seed}.pth")
     for func_type in func_type_lst:
-        result = main(func_type)
+        result = main(result,func_type)
 
     with FileLock(output_file + ".lock"):
         if os.path.exists(output_file):
