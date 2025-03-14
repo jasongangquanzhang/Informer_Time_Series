@@ -36,7 +36,7 @@ def piecewise_function(x, theta_1, theta_2):
         return theta_2 * x
 
 
-def generatedata_ld(T, func_type, covis=False):
+def generatedata_ld(T, func_type, covis=False, theta_0=0.5, theta_1=0.5):
     Z1 = np.random.uniform(-1, 1, T)
     Z2 = np.random.uniform(-1, 1, T)
     Z3 = np.random.uniform(-1, 1, T)
@@ -58,8 +58,8 @@ def generatedata_ld(T, func_type, covis=False):
 
     elif func_type == "arma":
         U = np.random.uniform(-1, 1, T)  # 生成长度为T的均匀分布随机数
-        theta_0 = 0.5
-        theta_1 = 0.5
+        theta_0 = theta_0
+        theta_1 = theta_1
         X = [U[0]]  # 初始化序列
         EX = [0]
         for t in range(1, T):
@@ -81,7 +81,9 @@ def generatedata_ld(T, func_type, covis=False):
             EX.append(EX_t)
 
     elif func_type == "ma":
-        U = np.random.uniform(-1, 1, T)  # Generate white noise from a normal distribution
+        U = np.random.uniform(
+            -1, 1, T
+        )  # Generate white noise from a normal distribution
         X = [U[0]]  # Initialize the series with the first noise term
         theta_0 = 0.5
         theta_1 = 0.5
@@ -175,37 +177,37 @@ def generatedata_ld(T, func_type, covis=False):
         U = np.random.randn(T)
         # U = np.random.uniform(-1, 1, T) # 生成长度为T的均匀分布随机数
         a1 = a2 = 0
-        b1 = 1
+        theta_0 = theta_0
         b2 = 1
         phi1 = 1
         phi2 = 1
-        theta_1 = 0.5
+        theta_1 = theta_1
         theta_2 = 0.2
         X = [U[0]]  # 初始化序列
         X.append(U[1])
         EX = [0, 0]
         for t in range(2, T):
             X_t = (
-                (a1 + b1 * np.exp(-phi1 * X[t - 1] ** 2)) * X[t - 1]
-                + (a2 + b2 * np.exp(-phi2 * X[t - 1] ** 2)) * X[t - 2]
+                (a1 + theta_0 * np.exp(-phi1 * X[t - 1] ** 2 + 1)) * X[t - 1]
+                # + (a2 + b2 * np.exp(-phi2 * X[t - 1] ** 2)) * X[t - 2]
                 + U[t]
                 + theta_1 * U[t - 1]
-                + theta_2 * U[t - 2]
+                # + theta_2 * U[t - 2]
             )
             X.append(X_t)
             EX_t = (
-                (a1 + b1 * np.exp(-phi1 * X[t - 1] ** 2)) * X[t - 1]
-                + (a2 + b2 * np.exp(-phi2 * X[t - 1] ** 2)) * X[t - 2]
+                (a1 + theta_0 * np.exp(-phi1 * X[t - 1] ** 2 + 1)) * X[t - 1]
+                # + (a2 + b2 * np.exp(-phi2 * X[t - 1] ** 2)) * X[t - 2]
                 + theta_1 * U[t - 1]
-                + theta_2 * U[t - 2]
+                # + theta_2 * U[t - 2]
             )
             EX.append(EX_t)
 
     elif func_type == "bilinear":
         U = np.random.uniform(-1, 1, T)  # 生成长度为T的均匀分布随机数
-        theta_0 = 0.5
-        theta_1 = 0.5
-        theta_2 = 0.5
+        theta_0 = theta_0
+        theta_1 = theta_1
+        theta_2 = theta_1
         X = [U[0]]  # 初始化序列
         EX = [0]
         for t in range(1, T):
@@ -272,6 +274,7 @@ def generate_arma_time_series(ar_params, ma_params, n_samples):
     time_series = arma_process.generate_sample(nsample=n_samples)
     return time_series
 
+
 # AR
 def rolling_auto_ar(
     data, pred_len, information_criterion="bic", seasonal=False, max_order=(10, 2, 10)
@@ -332,6 +335,7 @@ def rolling_auto_ar(
         arima_model.update(new_data)
 
     return forecasts, arima_model.order
+
 
 ###### ARMA Benchmark ######
 def rolling_auto_arima(
@@ -1165,10 +1169,10 @@ def rnn_forecast(train_data, val_data, test_data):
 
 
 # Main function
-def main(result,func_type):
-
+def main(result, func,theta_0,theta_1):
+    func_type = f"{func}_{theta_0}_{theta_1}"
     # Generate synthetic ARMA time series data
-    data, EX = generatedata_ld(data_length, func_type=func_type)
+    data, EX = generatedata_ld(data_length, func_type=func,theta_0=theta_0,theta_1=theta_1)
     # data = generate_arma_time_series(ar, ma, data_length)
     # std = data.std()
     test_value = data[-target_len:].tolist()
@@ -1180,13 +1184,15 @@ def main(result,func_type):
     ###### ARMA Module ######
     (
         result[f"{func_type}_ARMA"],
-        *_
+        *_,
         # result["ARMA_Order"],
         # result["ARMA_Train_loss"],
         # result["ARMA_Valid_loss"],
     ) = rolling_auto_arima(data=data, pred_len=target_len)
-    
-    result[f"{func_type}_AR"],*_ = rolling_auto_ar(data=data,pred_len=target_len,max_order=(20,2,0))
+
+    result[f"{func_type}_AR"], *_ = rolling_auto_ar(
+        data=data, pred_len=target_len, max_order=(20, 2, 0)
+    )
 
     ###### Informer Module ######
     informer_pred, informer_para, informer_lr = informer_predict(
@@ -1218,8 +1224,10 @@ if __name__ == "__main__":
     )
     arg = parser.parse_args()
     seed = int(arg.integer)
-    func_type_lst = ["arma","FAR","bilinear","lin-non1","STAR","non-non_X"]
-    # func_type = 
+    func_type_lst = ["arma", "FAR", "bilinear"]
+    theta_0_lst = [0.2, 0.5, 0.8]
+    theta_1_lst = [0, 0.2, 0.5, 0.8]
+    # func_type =
     # Generate data
     data_length = 1000
     target_len = 10
@@ -1236,7 +1244,7 @@ if __name__ == "__main__":
     # midway
     informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4]
-    num = 31
+    num = 32
     plot_dir = f"val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
@@ -1248,7 +1256,9 @@ if __name__ == "__main__":
     os.makedirs(checkpoint_dir, exist_ok=True)
     checkpoint_path = os.path.join(checkpoint_dir, f"best_model_seed_{seed}.pth")
     for func_type in func_type_lst:
-        result = main(result,func_type)
+        for theta_0 in theta_0_lst:
+            for theta_1 in theta_1_lst:
+                result = main(result, func=func_type,theta_0=theta_0,theta_1=theta_1)
 
     with FileLock(output_file + ".lock"):
         if os.path.exists(output_file):
