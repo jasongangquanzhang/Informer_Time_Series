@@ -81,7 +81,9 @@ def generatedata_ld(T, func_type, covis=False):
             EX.append(EX_t)
 
     elif func_type == "ma":
-        U = np.random.uniform(-1, 1, T)  # Generate white noise from a normal distribution
+        U = np.random.uniform(
+            -1, 1, T
+        )  # Generate white noise from a normal distribution
         X = [U[0]]  # Initialize the series with the first noise term
         theta_0 = 0.5
         theta_1 = 0.5
@@ -272,6 +274,7 @@ def generate_arma_time_series(ar_params, ma_params, n_samples):
     time_series = arma_process.generate_sample(nsample=n_samples)
     return time_series
 
+
 # AR
 def rolling_auto_ar(
     data, pred_len, information_criterion="bic", seasonal=False, max_order=(10, 2, 10)
@@ -332,6 +335,7 @@ def rolling_auto_ar(
         arima_model.update(new_data)
 
     return forecasts, arima_model.order
+
 
 ###### ARMA Benchmark ######
 def rolling_auto_arima(
@@ -455,7 +459,7 @@ class TimeSeriesDataset(Dataset):
         self.target_len = target_len
 
     def __len__(self):
-        return len(self.data) - self.seq_len - self.label_len - self.target_len + 1
+        return len(self.data) - self.seq_len - self.target_len + 1
 
     def __getitem__(self, idx):
         enc_input = self.data[idx : idx + self.seq_len]
@@ -476,38 +480,32 @@ def iterative_prediction_with_update(
     """
     Perform iterative prediction and update the model with each new prediction and true value.
     """
-
+    test_dataset = TimeSeriesDataset(
+        test_data, seq_len, label_len, pred_len, target_len=target_len
+    )
+    test_loader = DataLoader(test_dataset, batch_size=100, shuffle=False)
     predictions = []
     # Make a prediction
     model.eval()
     with torch.no_grad():
-        for step in range(target_len):
-            # Initialize encoder and decoder inputs
-            enc_in = (
-                torch.tensor(test_data[step : step + seq_len], dtype=torch.float32)
-                .unsqueeze(0)
-                .unsqueeze(-1)
-                .to(device)
-            )
-            dec_in = (
-                torch.tensor(
-                    test_data[step + seq_len - label_len : step + seq_len + pred_len],
-                    dtype=torch.float32,
-                )
-                .unsqueeze(0)
-                .unsqueeze(-1)
-                .to(device)
-            )
-            # Set the last point of decoder input to 0
-            dec_in[:, -1, :] = 0
-            pred = (
-                model(enc_in, enc_in, dec_in, dec_in).squeeze(-1).cpu().numpy()[0, -1]
+        for enc_input, dec_input, target in test_loader:
+            enc_input, dec_input, target = (
+                enc_input.unsqueeze(-1).to(device),
+                dec_input.unsqueeze(-1).to(device),
+                target.unsqueeze(-1).to(device),
             )
 
-            # Append prediction and true value to the results
-            predictions.append(pred)
+            y_pred = None
+            enc_in = enc_input
+            dec_in = dec_input
 
-    return predictions
+            # Set the last point of decoder input to 0 (masking the last point as before)
+            dec_in[:, -1, :] = 0  # Mask the last bit of decoder input
+
+            # Make the prediction using the model
+            pred = model(enc_in, enc_in, dec_in, dec_in)
+
+    return pred.squeeze(-1).cpu().numpy()[:, 0].tolist()
 
 
 # Train the Informer model
@@ -520,6 +518,7 @@ def train(
     epochs,
     device,
     checkpoint_path="checkpoint.pth",
+    target_len=1,
 ):
     """
     Train the model and return the final validation loss.
@@ -539,32 +538,17 @@ def train(
                 target.unsqueeze(-1).to(device),
             )
             optimizer.zero_grad()
-            y_pred = None
+
             enc_in = enc_input
             dec_in = dec_input
-            for step in range(target_len):
 
-                # Set the last point of decoder input to 0 (masking the last point as before)
-                dec_in[:, -1, :] = 0  # Mask the last bit of decoder input
+            # Set the last point of decoder input to 0 (masking the last point as before)
+            dec_in[:, -1, :] = 0  # Mask the last bit of decoder input
 
-                # Make the prediction using the model
-                pred = model(enc_in, enc_in, dec_in, dec_in)
+            # Make the prediction using the model
+            y_pred = model(enc_in, enc_in, dec_in, dec_in)
 
-                # Append the current prediction
-                if y_pred is None:
-                    y_pred = pred
-                else:
-                    y_pred = torch.cat((y_pred, pred), dim=1)
-                if y_pred.size()[1] == target_len:
-                    break
-                # Update the encoder input for the next time step:
-                # Concatenate the original enc_in (excluding the first item) and the first item of dec_in
-                enc_in = torch.cat(
-                    [enc_in[:, 1:, :], target[:, step : step + 1, :]], dim=1
-                )  # Shifted encoder input
-                dec_in = torch.cat(
-                    [dec_in[:, 1:-1, :], target[:, step : step + 2, :]], dim=1
-                )
+
             loss = criterion(y_pred, target)
             loss.backward()
             optimizer.step()
@@ -582,32 +566,16 @@ def train(
                     dec_input.unsqueeze(-1).to(device),
                     target.unsqueeze(-1).to(device),
                 )
-                y_pred = None
+
                 enc_in = enc_input
                 dec_in = dec_input
-                for step in range(target_len):
 
-                    # Set the last point of decoder input to 0 (masking the last point as before)
-                    dec_in[:, -1, :] = 0  # Mask the last bit of decoder input
 
-                    # Make the prediction using the model
-                    pred = model(enc_in, enc_in, dec_in, dec_in)
+                # Set the last point of decoder input to 0 (masking the last point as before)
+                dec_in[:, -1, :] = 0  # Mask the last bit of decoder input
 
-                    # Append the current prediction
-                    if y_pred is None:
-                        y_pred = pred
-                    else:
-                        y_pred = torch.cat((y_pred, pred), dim=1)
-                    if y_pred.size()[1] == target_len:
-                        break
-                    # Update the encoder input for the next time step:
-                    # Concatenate the original enc_in (excluding the first item) and the first item of dec_in
-                    enc_in = torch.cat(
-                        [enc_in[:, 1:, :], target[:, step : step + 1, :]], dim=1
-                    )  # Shifted encoder input
-                    dec_in = torch.cat(
-                        [dec_in[:, 1:-1, :], target[:, step : step + 2, :]], dim=1
-                    )
+                # Make the prediction using the model
+                y_pred = model(enc_in, enc_in, dec_in, dec_in)
 
                 loss = criterion(y_pred, target)
                 val_loss += loss.item()
@@ -643,10 +611,10 @@ def informer_predict(informer_len_combinations, data):
     best_val_loss = float("inf")
     best_combination = None
     best_model = None
-
+    target_len = 1
     # Iterate over all seq_len and label_len combinations
     for seq_len, label_len in informer_len_combinations:
-        train_len = len(data) - seq_len - target_len
+        train_len = len(data) - seq_len - 100
         train_split = int(train_len * 0.8)
         train_data = data[:train_split]
         val_data = data[train_split:train_len]
@@ -699,7 +667,7 @@ def informer_predict(informer_len_combinations, data):
                 val_loader,
                 criterion,
                 optimizer,
-                epochs=500,
+                epochs=1,
                 device=device,
                 checkpoint_path=checkpoint_path,
             )
@@ -794,11 +762,11 @@ def informer_predict(informer_len_combinations, data):
     # Perform iterative prediction using the best model
     informer_predictions = iterative_prediction_with_update(
         best_model,
-        data[len(data) - best_combination[0] - target_len :],
+        data[len(data) - best_combination[0] - 100 :],
         best_combination[0],
         best_combination[1],
         pred_len,
-        target_len,
+        1,
         device,
     )
 
@@ -1187,8 +1155,10 @@ def main():
         result["ARMA_Train_loss"],
         result["ARMA_Valid_loss"],
     ) = rolling_auto_arima(data=data, pred_len=target_len)
-    
-    result["AR"],result["AR_Order"] = rolling_auto_ar(data=data,pred_len=target_len,max_order=(20,2,0))
+
+    result["AR"], result["AR_Order"] = rolling_auto_ar(
+        data=data, pred_len=target_len, max_order=(20, 2, 0)
+    )
 
     ###### Informer Module ######
     informer_pred, informer_para, informer_lr = informer_predict(
@@ -1223,7 +1193,7 @@ if __name__ == "__main__":
     func_type = "arma"
     # Generate data
     data_length = 1000
-    target_len = 10
+    target_len = 100
     # Parameters for ARMA(2,1) process
     # ar = [1, -0.5, 0.25]  # AR coefficients
     # ma = [1, 0.4]  # MA coefficients
@@ -1233,11 +1203,11 @@ if __name__ == "__main__":
     d_ff = 512  # 2048
     dropout = 0.2
     # mercury
-    informer_len = [(10, 5), (20, 10), (50, 20)]
+    # informer_len = [(10, 5), (20, 10), (50, 20)]  
     # midway
-    # informer_len = [(10, 2), (20, 4), (50, 10)]
-    lr_lst = [1e-4]
-    num = 30
+    informer_len = [(10, 2), (20, 4), (50, 10)]
+    lr_lst = [1e-4, 1e-3, 1e-2]  
+    num = 1002
     plot_dir = f"val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
