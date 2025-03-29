@@ -459,14 +459,14 @@ class TimeSeriesDataset(Dataset):
         self.target_len = target_len
 
     def __len__(self):
-        return len(self.data) - self.seq_len - self.target_len + 1
+        return len(self.data) - self.seq_len - self.pred_len + 1
 
     def __getitem__(self, idx):
         enc_input = self.data[idx : idx + self.seq_len]
         dec_input = self.data[
             idx + self.seq_len - self.label_len : idx + self.seq_len + self.pred_len
         ]
-        target = self.data[idx + self.seq_len : idx + self.seq_len + self.target_len]
+        target = self.data[idx + self.seq_len : idx + self.seq_len + self.pred_len]
         return (
             torch.tensor(enc_input, dtype=torch.float32),
             torch.tensor(dec_input, dtype=torch.float32),
@@ -481,9 +481,9 @@ def iterative_prediction_with_update(
     Perform iterative prediction and update the model with each new prediction and true value.
     """
     test_dataset = TimeSeriesDataset(
-        test_data, seq_len, label_len, pred_len, target_len=target_len
+        test_data, seq_len, label_len, pred_len, target_len=1
     )
-    test_loader = DataLoader(test_dataset, batch_size=100, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=target_len, shuffle=False)
     predictions = []
     # Make a prediction
     model.eval()
@@ -518,7 +518,7 @@ def train(
     epochs,
     device,
     checkpoint_path="checkpoint.pth",
-    target_len=1,
+
 ):
     """
     Train the model and return the final validation loss.
@@ -611,21 +611,21 @@ def informer_predict(informer_len_combinations, data):
     best_val_loss = float("inf")
     best_combination = None
     best_model = None
-    target_len = 1
+
     # Iterate over all seq_len and label_len combinations
     for seq_len, label_len in informer_len_combinations:
-        train_len = len(data) - seq_len - 100
+        train_len = len(data) - seq_len - target_len
         train_split = int(train_len * 0.8)
         train_data = data[:train_split]
         val_data = data[train_split:train_len]
         # Prepare datasets and loaders
         train_dataset = TimeSeriesDataset(
-            train_data, seq_len, label_len, pred_len, target_len=target_len
+            train_data, seq_len, label_len, pred_len, target_len=1
         )
         val_dataset = TimeSeriesDataset(
-            val_data, seq_len, label_len, pred_len, target_len=target_len
+            val_data, seq_len, label_len, pred_len, target_len=1
         )
-        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=False)
         val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
         for lr in lr_lst:
@@ -762,11 +762,11 @@ def informer_predict(informer_len_combinations, data):
     # Perform iterative prediction using the best model
     informer_predictions = iterative_prediction_with_update(
         best_model,
-        data[len(data) - best_combination[0] - 100 :],
+        data[len(data) - best_combination[0] - target_len :],
         best_combination[0],
         best_combination[1],
         pred_len,
-        1,
+        target_len,
         device,
     )
 
@@ -1192,8 +1192,8 @@ if __name__ == "__main__":
     seed = int(arg.integer)
     func_type = "arma"
     # Generate data
-    data_length = 1000
-    target_len = 100
+    data_length = 1500
+    target_len = 500
     # Parameters for ARMA(2,1) process
     # ar = [1, -0.5, 0.25]  # AR coefficients
     # ma = [1, 0.4]  # MA coefficients
@@ -1207,7 +1207,7 @@ if __name__ == "__main__":
     # midway
     informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4, 1e-3, 1e-2]  
-    num = 1002
+    num = 1003
     plot_dir = f"val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
