@@ -459,14 +459,14 @@ class TimeSeriesDataset(Dataset):
         self.target_len = target_len
 
     def __len__(self):
-        return len(self.data) - self.seq_len - self.label_len - self.target_len + 1
+        return len(self.data) - self.seq_len - self.pred_len + 1
 
     def __getitem__(self, idx):
         enc_input = self.data[idx : idx + self.seq_len]
         dec_input = self.data[
             idx + self.seq_len - self.label_len : idx + self.seq_len + self.pred_len
         ]
-        target = self.data[idx + self.seq_len : idx + self.seq_len + self.target_len]
+        target = self.data[idx + self.seq_len : idx + self.seq_len + self.pred_len]
         return (
             torch.tensor(enc_input, dtype=torch.float32),
             torch.tensor(dec_input, dtype=torch.float32),
@@ -480,38 +480,32 @@ def iterative_prediction_with_update(
     """
     Perform iterative prediction and update the model with each new prediction and true value.
     """
-
+    test_dataset = TimeSeriesDataset(
+        test_data, seq_len, label_len, pred_len, target_len=1
+    )
+    test_loader = DataLoader(test_dataset, batch_size=target_len, shuffle=False)
     predictions = []
     # Make a prediction
     model.eval()
     with torch.no_grad():
-        for step in range(target_len):
-            # Initialize encoder and decoder inputs
-            enc_in = (
-                torch.tensor(test_data[step : step + seq_len], dtype=torch.float32)
-                .unsqueeze(0)
-                .unsqueeze(-1)
-                .to(device)
-            )
-            dec_in = (
-                torch.tensor(
-                    test_data[step + seq_len - label_len : step + seq_len + pred_len],
-                    dtype=torch.float32,
-                )
-                .unsqueeze(0)
-                .unsqueeze(-1)
-                .to(device)
-            )
-            # Set the last point of decoder input to 0
-            dec_in[:, -1, :] = 0
-            pred = (
-                model(enc_in, enc_in, dec_in, dec_in).squeeze(-1).cpu().numpy()[0, -1]
+        for enc_input, dec_input, target in test_loader:
+            enc_input, dec_input, target = (
+                enc_input.unsqueeze(-1).to(device),
+                dec_input.unsqueeze(-1).to(device),
+                target.unsqueeze(-1).to(device),
             )
 
-            # Append prediction and true value to the results
-            predictions.append(pred)
+            y_pred = None
+            enc_in = enc_input
+            dec_in = dec_input
 
-    return predictions
+            # Set the last point of decoder input to 0 (masking the last point as before)
+            dec_in[:, -1, :] = 0  # Mask the last bit of decoder input
+
+            # Make the prediction using the model
+            pred = model(enc_in, enc_in, dec_in, dec_in)
+
+    return pred.squeeze(-1).cpu().numpy()[:, 0].tolist()
 
 
 # Train the Informer model
@@ -543,32 +537,16 @@ def train(
                 target.unsqueeze(-1).to(device),
             )
             optimizer.zero_grad()
-            y_pred = None
+
             enc_in = enc_input
             dec_in = dec_input
-            for step in range(target_len):
 
-                # Set the last point of decoder input to 0 (masking the last point as before)
-                dec_in[:, -1, :] = 0  # Mask the last bit of decoder input
+            # Set the last point of decoder input to 0 (masking the last point as before)
+            dec_in[:, -1, :] = 0  # Mask the last bit of decoder input
 
-                # Make the prediction using the model
-                pred = model(enc_in, enc_in, dec_in, dec_in)
+            # Make the prediction using the model
+            y_pred = model(enc_in, enc_in, dec_in, dec_in)
 
-                # Append the current prediction
-                if y_pred is None:
-                    y_pred = pred
-                else:
-                    y_pred = torch.cat((y_pred, pred), dim=1)
-                if y_pred.size()[1] == target_len:
-                    break
-                # Update the encoder input for the next time step:
-                # Concatenate the original enc_in (excluding the first item) and the first item of dec_in
-                enc_in = torch.cat(
-                    [enc_in[:, 1:, :], target[:, step : step + 1, :]], dim=1
-                )  # Shifted encoder input
-                dec_in = torch.cat(
-                    [dec_in[:, 1:-1, :], target[:, step : step + 2, :]], dim=1
-                )
             loss = criterion(y_pred, target)
             loss.backward()
             optimizer.step()
@@ -586,32 +564,15 @@ def train(
                     dec_input.unsqueeze(-1).to(device),
                     target.unsqueeze(-1).to(device),
                 )
-                y_pred = None
+
                 enc_in = enc_input
                 dec_in = dec_input
-                for step in range(target_len):
 
-                    # Set the last point of decoder input to 0 (masking the last point as before)
-                    dec_in[:, -1, :] = 0  # Mask the last bit of decoder input
+                # Set the last point of decoder input to 0 (masking the last point as before)
+                dec_in[:, -1, :] = 0  # Mask the last bit of decoder input
 
-                    # Make the prediction using the model
-                    pred = model(enc_in, enc_in, dec_in, dec_in)
-
-                    # Append the current prediction
-                    if y_pred is None:
-                        y_pred = pred
-                    else:
-                        y_pred = torch.cat((y_pred, pred), dim=1)
-                    if y_pred.size()[1] == target_len:
-                        break
-                    # Update the encoder input for the next time step:
-                    # Concatenate the original enc_in (excluding the first item) and the first item of dec_in
-                    enc_in = torch.cat(
-                        [enc_in[:, 1:, :], target[:, step : step + 1, :]], dim=1
-                    )  # Shifted encoder input
-                    dec_in = torch.cat(
-                        [dec_in[:, 1:-1, :], target[:, step : step + 2, :]], dim=1
-                    )
+                # Make the prediction using the model
+                y_pred = model(enc_in, enc_in, dec_in, dec_in)
 
                 loss = criterion(y_pred, target)
                 val_loss += loss.item()
@@ -656,12 +617,12 @@ def informer_predict(informer_len_combinations, data):
         val_data = data[train_split:train_len]
         # Prepare datasets and loaders
         train_dataset = TimeSeriesDataset(
-            train_data, seq_len, label_len, pred_len, target_len=target_len
+            train_data, seq_len, label_len, pred_len, target_len=1
         )
         val_dataset = TimeSeriesDataset(
-            val_data, seq_len, label_len, pred_len, target_len=target_len
+            val_data, seq_len, label_len, pred_len, target_len=1
         )
-        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=False)
         val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
         for lr in lr_lst:
@@ -1169,10 +1130,12 @@ def rnn_forecast(train_data, val_data, test_data):
 
 
 # Main function
-def main(result, func,theta_0,theta_1):
+def main(result, func, theta_0, theta_1):
     func_type = f"{func}_{theta_0}_{theta_1}"
     # Generate synthetic ARMA time series data
-    data, EX = generatedata_ld(data_length, func_type=func,theta_0=theta_0,theta_1=theta_1)
+    data, EX = generatedata_ld(
+        data_length, func_type=func, theta_0=theta_0, theta_1=theta_1
+    )
     # data = generate_arma_time_series(ar, ma, data_length)
     # std = data.std()
     test_value = data[-target_len:].tolist()
@@ -1244,11 +1207,11 @@ if __name__ == "__main__":
     # midway
     informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4]
-    num = 32
+    num = 2
     plot_dir = f"val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
-    output_file = f"csv_results/result_{num}.csv"
+    output_file = f"table_results/result_{num}.csv"
     set_seed(seed)
     result = {"seed": seed}
 
@@ -1258,7 +1221,7 @@ if __name__ == "__main__":
     for func_type in func_type_lst:
         for theta_0 in theta_0_lst:
             for theta_1 in theta_1_lst:
-                result = main(result, func=func_type,theta_0=theta_0,theta_1=theta_1)
+                result = main(result, func=func_type, theta_0=theta_0, theta_1=theta_1)
 
     with FileLock(output_file + ".lock"):
         if os.path.exists(output_file):
