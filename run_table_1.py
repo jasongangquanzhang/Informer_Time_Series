@@ -1189,7 +1189,7 @@ if __name__ == "__main__":
     seed = int(arg.integer)
     func_type_lst = ["arma", "FAR", "bilinear"]
     theta_0_lst = [0.2, 0.5, 0.8]
-    theta_1_lst = [0, 0.2, 0.5, 0.8]
+    theta_1_lst = [0.5, 0.8] #0, 0.2, 
     # func_type =
     # Generate data
     data_length = 1000
@@ -1207,7 +1207,7 @@ if __name__ == "__main__":
     # midway
     informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4]
-    num = 2
+    num = 22
     plot_dir = f"val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
