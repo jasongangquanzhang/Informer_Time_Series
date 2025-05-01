@@ -38,7 +38,6 @@ def contaminate_data(data, input_len, target_len, K=5, delta_range=(5,8)):
     
     # 提取训练部分（排除最后用于测试的点）
     train_data = data[: -(input_len+target_len)]
-    
     # 构建训练样本
     train_X, positions = [], []
     for i in range(len(train_data) - total_len + 1):
@@ -1179,7 +1178,7 @@ def main():
 
     # Generate synthetic ARMA time series data
     data, EX = generatedata_ld(data_length, func_type=func_type)
-    data = contaminate_data(data, 50, target_len, K=5, delta_range=(10, 20))
+    data = contaminate_data(data=data, input_len=50, target_len=target_len, K=1, delta_range=(10, 20))
 
     test_value = data[-target_len:].tolist()
     true_value = EX[-target_len:].tolist()
