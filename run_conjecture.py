@@ -64,7 +64,7 @@ def contaminate_data(data, input_len, target_len, K=5, delta_range=(5,8)):
         data_modified[start:end] += noise
         print(f"Injected noise to data[{start}:{end}]")
 
-    return data_modified
+    return data_modified, data_modified[start:end]
 
 
 def piecewise_function(x, theta_1, theta_2):
@@ -1178,13 +1178,14 @@ def main():
 
     # Generate synthetic ARMA time series data
     data, EX = generatedata_ld(data_length, func_type=func_type)
-    data = contaminate_data(data=data, input_len=50, target_len=target_len, K=1, delta_range=(10, 20))
-
+    data,datacontaminated = contaminate_data(data=data, input_len=50, target_len=target_len, K=1, delta_range=(10, 20))
+    
     test_value = data[-target_len:].tolist()
     true_value = EX[-target_len:].tolist()
     # result['STD'] = std
     result["Test"] = test_value
     result["True"] = true_value
+    result["contaminated"] = datacontaminated.tolist()
 
     ###### ARMA Module ######
     (
@@ -1245,7 +1246,7 @@ if __name__ == "__main__":
     # midway
     informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4, 1e-3, 1e-2]  
-    num = 2
+    num = 3
     plot_dir = f"val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
