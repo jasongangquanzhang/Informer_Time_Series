@@ -490,6 +490,7 @@ def iterative_prediction_with_update(
         inputs = {
             "past_values": input_data.squeeze(-1) if input_data.dim() > 2 else input_data,
             "past_time_features": torch.zeros(input_data.shape[0], input_data.shape[1], 1).to(device),
+            "past_observed_mask": torch.ones(input_data.shape[0], input_data.shape[1], 1).to(device),
         }
         
         # Get predictions
@@ -542,7 +543,9 @@ def train_hf_informer(
             inputs = {
                 "past_values": enc_input.squeeze(-1),  # [batch_size, seq_len]
                 "past_time_features": torch.zeros(enc_input.shape[0], enc_input.shape[1], 1).to(device),  # Placeholder
+                "past_observed_mask": torch.ones(enc_input.shape[0], enc_input.shape[1], 1).to(device),
                 "future_values": target.squeeze(-1),  # For training
+                
             }
             
             # Forward pass
@@ -570,6 +573,7 @@ def train_hf_informer(
                 inputs = {
                     "past_values": enc_input.squeeze(-1),
                     "past_time_features": torch.zeros(enc_input.shape[0], enc_input.shape[1], 1).to(device),
+                    "past_observed_mask": torch.ones(enc_input.shape[0], enc_input.shape[1], 1).to(device),
                     "future_values": target.squeeze(-1),  # For validation
                 }
                 
@@ -641,7 +645,7 @@ def informer_predict(informer_len_combinations, data):
                 context_length=seq_len,
                 lags_sequence=[1, 2, 3, 4, 5, 6, 7],
                 input_size=pred_len,  # Default lags, adjust as needed
-                num_time_features=1,  # Adjust based on your features
+                num_time_features=0,  # Adjust based on your features
                 # Optional parameters to match your original model
                 d_model=d_model,
                 num_encoder_layers=2,
@@ -659,7 +663,7 @@ def informer_predict(informer_len_combinations, data):
             # If you want to use a specific pretrained model:
             # model = InformerForPrediction.from_pretrained("huggingface/informer-model-name", config=config)
             # Or initialize with configuration:
-            model = InformerForPrediction(config)
+            model = InformerForPrediction.from_pretrained("huggingface/informer-tourism-monthly",config=config)
             model = model.to(device)
             
             # Training setup
@@ -1153,16 +1157,16 @@ def main():
     result["True"] = true_value
 
     ###### ARMA Module ######
-    (
-        result["ARMA"],
-        result["ARMA_Order"],
-        result["ARMA_Train_loss"],
-        result["ARMA_Valid_loss"],
-    ) = rolling_auto_arima(data=data, pred_len=target_len)
+    # (
+    #     result["ARMA"],
+    #     result["ARMA_Order"],
+    #     result["ARMA_Train_loss"],
+    #     result["ARMA_Valid_loss"],
+    # ) = rolling_auto_arima(data=data, pred_len=target_len)
 
-    result["AR"], result["AR_Order"] = rolling_auto_ar(
-        data=data, pred_len=target_len, max_order=(20, 2, 0)
-    )
+    # result["AR"], result["AR_Order"] = rolling_auto_ar(
+    #     data=data, pred_len=target_len, max_order=(20, 2, 0)
+    # )
 
     ###### Informer Module ######
     informer_pred, informer_para, informer_lr = informer_predict(
