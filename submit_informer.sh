@@ -14,4 +14,4 @@ source activate ganett
 
 echo "Array ID: $SLURM_ARRAY_TASK_ID"
 
-srun /home/gangquanz/.conda/envs/ganett/bin/python3.12 /home/gangquanz/Informer_Time_Series/run_conjecture.py $SLURM_ARRAY_TASK_ID
+srun /home/gangquanz/.conda/envs/ganett/bin/python3.12 /home/gangquanz/Informer_Time_Series/informer_pretrained.py $SLURM_ARRAY_TASK_ID

@@ -1172,15 +1172,15 @@ def main():
     result["Informer_para"] = informer_para
     result["Informer_lr"] = informer_lr
     ###### RNN Module ######
-    train_len = data_length - target_len
-    train_split = int(train_len * 0.8)
-    train_data = data[:train_split]
-    val_data = data[train_split:train_len]
-    test_data = data[train_len:]
-    rnn_predictions = rnn_forecast(
-        train_data=train_data, val_data=val_data, test_data=test_data
-    )
-    result["RNN"] = rnn_predictions.tolist()
+    # train_len = data_length - target_len
+    # train_split = int(train_len * 0.8)
+    # train_data = data[:train_split]
+    # val_data = data[train_split:train_len]
+    # test_data = data[train_len:]
+    # rnn_predictions = rnn_forecast(
+    #     train_data=train_data, val_data=val_data, test_data=test_data
+    # )
+    # result["RNN"] = rnn_predictions.tolist()
 
     return result
 
@@ -1196,8 +1196,8 @@ if __name__ == "__main__":
     seed = int(arg.integer)
     func_type = "arma"
     # Generate data
-    data_length = 1500
-    target_len = 500
+    data_length = 1100
+    target_len = 100
     # Parameters for ARMA(2,1) process
     # ar = [1, -0.5, 0.25]  # AR coefficients
     # ma = [1, 0.4]  # MA coefficients
@@ -1211,11 +1211,11 @@ if __name__ == "__main__":
     # midway
     informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4, 1e-3, 1e-2]  
-    num = 1003
-    plot_dir = f"val_plots_{num}"
+    num = 1
+    plot_dir = f"pretrained_val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
-    output_file = f"csv_results/result_{num}.csv"
+    output_file = f"csv_results_pretrained/result_{num}.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
