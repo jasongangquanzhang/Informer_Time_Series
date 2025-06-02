@@ -466,8 +466,8 @@ def fine_tune_predict(data):
     forecast_result = []
     for i in range(TEST):
         print(i)
-        # inp = next(input_it)
-        # label = next(label_it)
+        inp = next(input_it)
+        label = next(label_it)
         forecast = next(forecast_it)
         forecast_result.append(forecast.samples[0][0])
     return forecast_result
