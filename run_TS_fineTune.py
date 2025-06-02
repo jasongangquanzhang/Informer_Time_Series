@@ -416,8 +416,7 @@ def rolling_auto_arima(
 def fine_tune_predict(data):
     date_range = pd.date_range("2000-01-01", periods=data_length, freq="D")
     df = pd.DataFrame({"value": data}, index=date_range)
-
-    # 3. Convert into GluonTS dataset
+    # Create a PandasDataset from the DataFrame
     ds = PandasDataset({"value": df["value"]})
 
     MODEL = "moirai"  # model name: choose from {'moirai', 'moirai-moe'}
@@ -465,14 +464,337 @@ def fine_tune_predict(data):
 
     forecast_result = []
     for i in range(TEST):
-        print(i)
-        inp = next(input_it)
-        label = next(label_it)
+        # print(i)
+        # inp = next(input_it)
+        # label = next(label_it)
         forecast = next(forecast_it)
         forecast_result.append(forecast.samples[0][0])
     return forecast_result
 
 
+
+# Define custom dataset class
+class TimeSeriesDataset(Dataset):
+    def __init__(self, data, seq_len, label_len, pred_len, target_len):
+        self.data = data
+        self.seq_len = seq_len
+        self.label_len = label_len
+        self.pred_len = pred_len
+        self.target_len = target_len
+
+    def __len__(self):
+        return len(self.data) - self.seq_len - self.pred_len + 1
+
+    def __getitem__(self, idx):
+        enc_input = self.data[idx : idx + self.seq_len]
+        dec_input = self.data[
+            idx + self.seq_len - self.label_len : idx + self.seq_len + self.pred_len
+        ]
+        target = self.data[idx + self.seq_len : idx + self.seq_len + self.pred_len]
+        return (
+            torch.tensor(enc_input, dtype=torch.float32),
+            torch.tensor(dec_input, dtype=torch.float32),
+            torch.tensor(target, dtype=torch.float32),
+        )
+
+
+def iterative_prediction_with_update(
+    model, test_data, seq_len, label_len, pred_len, target_len, device
+):
+    """
+    Perform iterative prediction and update the model with each new prediction and true value.
+    """
+    test_dataset = TimeSeriesDataset(
+        test_data, seq_len, label_len, pred_len, target_len=1
+    )
+    test_loader = DataLoader(test_dataset, batch_size=target_len, shuffle=False)
+    predictions = []
+    # Make a prediction
+    model.eval()
+    with torch.no_grad():
+        for enc_input, dec_input, target in test_loader:
+            enc_input, dec_input, target = (
+                enc_input.unsqueeze(-1).to(device),
+                dec_input.unsqueeze(-1).to(device),
+                target.unsqueeze(-1).to(device),
+            )
+
+            y_pred = None
+            enc_in = enc_input
+            dec_in = dec_input
+
+            # Set the last point of decoder input to 0 (masking the last point as before)
+            dec_in[:, -1, :] = 0  # Mask the last bit of decoder input
+
+            # Make the prediction using the model
+            pred = model(enc_in, enc_in, dec_in, dec_in)
+
+    return pred.squeeze(-1).cpu().numpy()[:, 0].tolist()
+
+
+# Train the Informer model
+def train(
+    model,
+    train_loader,
+    val_loader,
+    criterion,
+    optimizer,
+    epochs,
+    device,
+    checkpoint_path="checkpoint.pth",
+
+):
+    """
+    Train the model and return the final validation loss.
+    """
+    early_stopping = EarlyStopping(patience=8, verbose=True, path=checkpoint_path)
+    best_val_loss = float("inf")  # Track the best validation loss
+    train_lst = []
+    val_lst = []
+    for epoch in range(epochs):
+        model.train()
+        train_loss = 0
+        # Training loop
+        for enc_input, dec_input, target in train_loader:
+            enc_input, dec_input, target = (
+                enc_input.unsqueeze(-1).to(device),
+                dec_input.unsqueeze(-1).to(device),
+                target.unsqueeze(-1).to(device),
+            )
+            optimizer.zero_grad()
+
+            enc_in = enc_input
+            dec_in = dec_input
+
+            # Set the last point of decoder input to 0 (masking the last point as before)
+            dec_in[:, -1, :] = 0  # Mask the last bit of decoder input
+
+            # Make the prediction using the model
+            y_pred = model(enc_in, enc_in, dec_in, dec_in)
+
+
+            loss = criterion(y_pred, target)
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item()
+
+        train_loss /= len(train_loader)
+
+        # Validation loop
+        model.eval()
+        val_loss = 0
+        with torch.no_grad():
+            for enc_input, dec_input, target in val_loader:
+                enc_input, dec_input, target = (
+                    enc_input.unsqueeze(-1).to(device),
+                    dec_input.unsqueeze(-1).to(device),
+                    target.unsqueeze(-1).to(device),
+                )
+
+                enc_in = enc_input
+                dec_in = dec_input
+
+
+                # Set the last point of decoder input to 0 (masking the last point as before)
+                dec_in[:, -1, :] = 0  # Mask the last bit of decoder input
+
+                # Make the prediction using the model
+                y_pred = model(enc_in, enc_in, dec_in, dec_in)
+
+                loss = criterion(y_pred, target)
+                val_loss += loss.item()
+            val_loss /= len(val_loader)
+
+        train_lst.append(train_loss)
+        val_lst.append(val_loss)
+        print(
+            f"Epoch [{epoch + 1}/{epochs}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}"
+        )
+
+        # Save the best model
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            best_model_state = deepcopy(model.state_dict())
+
+        early_stopping(val_loss, model=model)
+        if early_stopping.early_stop:
+            print("Early stopping")
+            break
+
+    # Load the best model
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state)
+    return best_val_loss, train_lst, val_lst
+
+
+def informer_predict(informer_len_combinations, data):
+    """
+    Perform grid search over seq_len and label_len combinations to choose the best one based on validation loss.
+    """
+
+    best_val_loss = float("inf")
+    best_combination = None
+    best_model = None
+
+    # Iterate over all seq_len and label_len combinations
+    for seq_len, label_len in informer_len_combinations:
+        train_len = len(data) - seq_len - target_len
+        train_split = int(train_len * 0.8)
+        train_data = data[:train_split]
+        val_data = data[train_split:train_len]
+        # Prepare datasets and loaders
+        train_dataset = TimeSeriesDataset(
+            train_data, seq_len, label_len, pred_len, target_len=1
+        )
+        val_dataset = TimeSeriesDataset(
+            val_data, seq_len, label_len, pred_len, target_len=1
+        )
+        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=False)
+        val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+
+        for lr in lr_lst:
+
+            # Model setup
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            print(f"Using device: {device}")
+            model = Informer(
+                enc_in=1,
+                dec_in=1,
+                c_out=1,
+                seq_len=seq_len,
+                label_len=label_len,
+                out_len=pred_len,
+                factor=5,
+                d_model=d_model,
+                n_heads=8,
+                e_layers=2,
+                d_layers=1,
+                d_ff=d_ff,
+                dropout=dropout,
+                attn="prob",
+                embed="fixed",
+                freq="h",
+                activation="gelu",
+                output_attention=False,
+                distil=True,
+                mix=True,
+                device=device,
+            ).to(device)
+
+            # Training setup
+            criterion = torch.nn.MSELoss()
+            optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.001)
+            # optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+            val_loss, train_lst, val_lst = train(
+                model,
+                train_loader,
+                val_loader,
+                criterion,
+                optimizer,
+                epochs=500,
+                device=device,
+                checkpoint_path=checkpoint_path,
+            )
+
+            # Update the best combination
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                best_combination = (seq_len, label_len)
+                best_model = model  # Save model parameters
+                best_lr = lr
+                best_train_lst = train_lst
+                best_val_lst = val_lst
+
+    print(
+        f"Best Combination: seq_len: {best_combination[0]}, label_len: {best_combination[1]}, Val Loss: {best_val_loss:.4f}"
+    )
+
+    # Find minimum losses
+    min_val_loss = min(best_val_lst)
+    min_train_loss = min(best_train_lst)
+
+    # Find epochs where minimum losses occur
+    min_val_epoch = best_val_lst.index(min_val_loss) + 1
+    min_train_epoch = best_train_lst.index(min_train_loss) + 1
+
+    # Plot training and validation loss
+    plt.figure(figsize=(10, 6))
+    plt.plot(
+        range(1, len(best_val_lst) + 1),
+        best_val_lst,
+        marker="o",
+        label="Validation Loss",
+        color="r",
+    )
+    plt.plot(
+        range(1, len(best_train_lst) + 1),
+        best_train_lst,
+        marker="s",
+        label="Training Loss",
+        color="b",
+    )
+
+    # Mark minimum points
+    plt.scatter(
+        min_val_epoch,
+        min_val_loss,
+        color="red",
+        s=100,
+        zorder=3,
+        label=f"Min Val Loss: {min_val_loss:.4f}",
+    )
+    plt.scatter(
+        min_train_epoch,
+        min_train_loss,
+        color="blue",
+        s=100,
+        zorder=3,
+        label=f"Min Train Loss: {min_train_loss:.4f}",
+    )
+
+    # Add text annotations to show the exact loss values
+    plt.text(
+        min_val_epoch,
+        min_val_loss,
+        f"{min_val_loss:.4f}",
+        fontsize=12,
+        verticalalignment="bottom",
+        horizontalalignment="right",
+        color="red",
+    )
+    plt.text(
+        min_train_epoch,
+        min_train_loss,
+        f"{min_train_loss:.4f}",
+        fontsize=12,
+        verticalalignment="top",
+        horizontalalignment="right",
+        color="blue",
+    )
+
+    # Labels and title
+    plt.title("Training and Validation Loss Over Epochs")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.grid()
+
+    # Save the plot
+    plt.savefig(f"{plot_dir}/validation_loss_plot_{seed}.png")
+    plt.show()
+
+    # Perform iterative prediction using the best model
+    informer_predictions = iterative_prediction_with_update(
+        best_model,
+        data[len(data) - best_combination[0] - target_len :],
+        best_combination[0],
+        best_combination[1],
+        pred_len,
+        target_len,
+        device,
+    )
+
+    return informer_predictions, best_combination, best_lr
 
 # Main function
 def main():
@@ -502,6 +824,13 @@ def main():
     #     data=data, pred_len=target_len, max_order=(20, 2, 0)
     # )
 
+    # informer_pred, informer_para, informer_lr = informer_predict(
+    #     informer_len_combinations=informer_len, data=data
+    # )
+    # result["Informer"] = informer_pred
+    # result["Informer_para"] = informer_para
+    # result["Informer_lr"] = informer_lr
+    
     ####### Fine-tune Moirai ######
     result["Moirai"] = fine_tune_predict(data)
     return result
@@ -528,6 +857,8 @@ if __name__ == "__main__":
     d_model = 64  # 512
     d_ff = 512  # 2048
     dropout = 0.2
+    
+    
     #############Pretrained Model Settings#############
     
     # mercury
@@ -535,6 +866,7 @@ if __name__ == "__main__":
     # midway
     informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4, 1e-3, 1e-2]  
+    
     num = 1
     plot_dir = f"pretrained_val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
