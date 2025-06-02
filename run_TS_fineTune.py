@@ -413,6 +413,7 @@ def rolling_auto_arima(
 
     return forecasts, arima_model.order, train_mse, valid_mse
 
+######## Moirai Fine-tune ########
 def fine_tune_predict(data):
     date_range = pd.date_range("2000-01-01", periods=data_length, freq="D")
     df = pd.DataFrame({"value": data}, index=date_range)
@@ -472,6 +473,7 @@ def fine_tune_predict(data):
     return forecast_result
 
 
+###### Informer Module ######
 class EarlyStopping:
     def __init__(self, patience=5, verbose=False, delta=0, path="checkpoint.pth"):
         """
@@ -855,12 +857,12 @@ def main():
     result["True"] = true_value
 
     # ###### ARMA Module ######
-    # (
-    #     result["ARMA"],
-    #     result["ARMA_Order"],
-    #     result["ARMA_Train_loss"],
-    #     result["ARMA_Valid_loss"],
-    # ) = rolling_auto_arima(data=data, pred_len=target_len)
+    (
+        result["ARMA"],
+        result["ARMA_Order"],
+        result["ARMA_Train_loss"],
+        result["ARMA_Valid_loss"],
+    ) = rolling_auto_arima(data=data, pred_len=target_len)
 
     # result["AR"], result["AR_Order"] = rolling_auto_ar(
     #     data=data, pred_len=target_len, max_order=(20, 2, 0)
