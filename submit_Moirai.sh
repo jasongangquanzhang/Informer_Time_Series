@@ -6,7 +6,7 @@
 #SBATCH --partition=amd
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=10
-#SBATCH --array=1-100
+#SBATCH --array=1-2
 #SBATCH --mem-per-cpu=8000
 
 module load python/anaconda-2023.09
