@@ -5,7 +5,12 @@ import torch.nn as nn
 import torch.optim as optim
 import random
 from torch.utils.data import DataLoader, Dataset
-from transformers import InformerForPrediction, InformerConfig# Assuming Informer model is already defined and available
+from transformers import (
+    InformerConfig,
+    InformerForPrediction,
+    Trainer,
+    TrainingArguments,
+)  # Assuming Informer model is already defined and available
 from models.RNN import CustomReLUNet, CustomReLURNN
 from sklearn.metrics import mean_squared_error
 from statsmodels.tsa.arima_process import ArmaProcess
@@ -447,166 +452,136 @@ class EarlyStopping:
         self.val_loss_min = val_loss
 
 
-# Define custom dataset class
-class TimeSeriesDataset(Dataset):
-    def __init__(self, data, seq_len, label_len, pred_len, target_len):
-        self.data = data
-        self.seq_len = seq_len
-        self.label_len = label_len
-        self.pred_len = pred_len
-        self.target_len = target_len
+class UnivariateTimeSeriesDataset(Dataset):
+    def __init__(self, series, context_length=20):
+        self.series = series
+        self.context_length = context_length
+        self.prediction_length = 1  # fixed to 1
 
     def __len__(self):
-        return len(self.data) - self.seq_len - self.pred_len + 1
+        return len(self.series) - self.context_length - self.prediction_length
 
     def __getitem__(self, idx):
-        enc_input = self.data[idx : idx + self.seq_len]
-        dec_input = self.data[
-            idx + self.seq_len - self.label_len : idx + self.seq_len + self.pred_len
-        ]
-        target = self.data[idx + self.seq_len : idx + self.seq_len + self.pred_len]
-        return (
-            torch.tensor(enc_input, dtype=torch.float32),
-            torch.tensor(dec_input, dtype=torch.float32),
-            torch.tensor(target, dtype=torch.float32),
-        )
+        past_values = self.series[idx : idx + self.context_length]
+        future_values = self.series[
+            idx + self.context_length : idx + self.context_length + 1
+        ]  # 1 target
+
+        return {
+            "past_values": torch.tensor(past_values, dtype=torch.float).unsqueeze(-1),
+            "past_observed_mask": torch.ones(self.context_length, 1),
+            "future_values": torch.tensor(future_values, dtype=torch.float).unsqueeze(
+                -1
+            ),
+            "past_time_features": torch.zeros(self.context_length, 4),
+            "future_time_features": torch.zeros(1, 4),
+            "static_categorical_features": torch.zeros(1, dtype=torch.long),
+            "static_real_features": torch.zeros(1),
+        }
+
+
+def collate_fn(batch):
+    return {key: torch.stack([x[key] for x in batch]) for key in batch[0]}
+
+
+def load_model():
+    config = InformerConfig.from_pretrained(
+        "huggingface/informer-tourism-monthly"  # override to match your target shape
+    )
+    config.prediction_length = 1
+    model = InformerForPrediction.from_pretrained(
+        "huggingface/informer-tourism-monthly",
+        config=config,
+        ignore_mismatched_sizes=True,
+    )
+    return model
+
 
 def iterative_prediction_with_update(
-    model, test_data, seq_len, label_len, pred_len, target_len, device
+    model, test_data, context_length, prediction_length, device
 ):
     """
-    Perform iterative prediction using the Hugging Face Informer model.
+    Perform iterative prediction using the pretrained Hugging Face Informer model.
+    Output shape is (B, 1, 1).
     """
     model.eval()
-    
-    # Prepare input data
-    input_data = torch.tensor(test_data[:seq_len], dtype=torch.float32).unsqueeze(0).to(device)  # [1, seq_len]
-    
-    # For storing predictions
     predictions = []
-    
-    with torch.no_grad():
-        # Create inputs for the model
+
+    # Iterate one step at a time for each future prediction
+    for i in range(len(test_data) - context_length - prediction_length + 1):
+        context_window = test_data[i : i + context_length]
+
+        # Prepare input tensors
         inputs = {
-            "past_values": input_data.squeeze(-1) if input_data.dim() > 2 else input_data,
-            "past_time_features": torch.zeros(input_data.shape[0], input_data.shape[1], 1).to(device),
-            "past_observed_mask": torch.ones(input_data.shape[0], input_data.shape[1], 1).to(device),
+            "past_values": torch.tensor(context_window, dtype=torch.float32)
+            .unsqueeze(0)
+            .unsqueeze(-1)
+            .to(device),  # (1, context_length, 1)
+            "past_observed_mask": torch.ones(1, context_length, 1).to(device),
+            "past_time_features": torch.zeros(1, context_length, 4).to(device),
+            "future_time_features": torch.zeros(1, prediction_length, 4).to(device),
+            "static_categorical_features": torch.zeros(1, 1, dtype=torch.long).to(
+                device
+            ),
+            "static_real_features": torch.zeros(1, 1).to(device),
         }
-        
-        # Get predictions
-        outputs = model.generate(**inputs, prediction_length=pred_len)
-        pred = outputs.sequences
-        
-        # Convert to list and return
-        predictions = pred.squeeze().cpu().numpy().tolist()
-        
-        # If predictions is a single value, convert to list
-        if not isinstance(predictions, list):
-            predictions = [predictions]
-            
-    return predictions
 
-# Train the Informer model
-def train_hf_informer(
-    model,
-    train_loader,
-    val_loader,
-    criterion,
-    optimizer,
-    epochs,
-    device,
-    checkpoint_path="checkpoint.pth",
-):
-    """
-    Train the Hugging Face Informer model and return the final validation loss.
-    """
-    early_stopping = EarlyStopping(patience=8, verbose=True, path=checkpoint_path)
-    best_val_loss = float("inf")  # Track the best validation loss
-    train_lst = []
-    val_lst = []
-    best_model_state = None
-    
-    for epoch in range(epochs):
-        model.train()
-        train_loss = 0
-        
-        # Training loop
-        for enc_input, dec_input, target in train_loader:
-            # Reshape inputs for HF Informer
-            enc_input = enc_input.unsqueeze(-1).to(device)  # [batch_size, seq_len, 1]
-            target = target.unsqueeze(-1).to(device)  # [batch_size, pred_len, 1]
-            
-            optimizer.zero_grad()
-            
-            # Hugging Face Informer expects different input format
-            # We need to adapt our inputs to match what HF Informer expects
-            inputs = {
-                "past_values": enc_input.squeeze(-1),  # [batch_size, seq_len]
-                "past_time_features": torch.zeros(enc_input.shape[0], enc_input.shape[1], 1).to(device),  # Placeholder
-                "past_observed_mask": torch.ones(enc_input.shape[0], enc_input.shape[1], 1).to(device),
-                "future_values": target.squeeze(-1),  # For training
-                
-            }
-            
-            # Forward pass
-            outputs = model(**inputs)
-            loss = outputs.loss  # HF models typically return loss directly
-            
-            # If the model doesn't return loss directly, calculate it
-            if loss is None:
-                loss = criterion(outputs.predictions, target.squeeze(-1))
-                
-            loss.backward()
-            optimizer.step()
-            train_loss += loss.item()
-
-        train_loss /= len(train_loader)
-
-        # Validation loop
-        model.eval()
-        val_loss = 0
         with torch.no_grad():
-            for enc_input, dec_input, target in val_loader:
-                enc_input = enc_input.unsqueeze(-1).to(device)
-                target = target.unsqueeze(-1).to(device)
-                
-                inputs = {
-                    "past_values": enc_input.squeeze(-1),
-                    "past_time_features": torch.zeros(enc_input.shape[0], enc_input.shape[1], 1).to(device),
-                    "past_observed_mask": torch.ones(enc_input.shape[0], enc_input.shape[1], 1).to(device),
-                    "future_values": target.squeeze(-1),  # For validation
-                }
-                
-                outputs = model(**inputs)
-                if hasattr(outputs, 'loss') and outputs.loss is not None:
-                    loss = outputs.loss
-                else:
-                    loss = criterion(outputs.predictions, target.squeeze(-1))
-                    
-                val_loss += loss.item()
-                
-            val_loss /= len(val_loader)
+            outputs = model(**inputs)
 
-        train_lst.append(train_loss)
-        val_lst.append(val_loss)
-        print(
-            f"Epoch [{epoch + 1}/{epochs}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}"
-        )
+        # Get prediction: (1, prediction_length, 1), take first step only
+        pred = outputs.predictions[:, 0, :].unsqueeze(1)  # shape (1, 1, 1)
+        predictions.append(pred.cpu())
 
-        # Save the best model
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            best_model_state = deepcopy(model.state_dict())
+    return torch.cat(predictions, dim=0).numpy().tolist()  # Final shape: (N, 1, 1)
 
-        early_stopping(val_loss, model=model)
-        if early_stopping.early_stop:
-            print("Early stopping")
-            break
 
-    # Load the best model
-    if best_model_state is not None:
-        model.load_state_dict(best_model_state)
-    return best_val_loss, train_lst, val_lst
+def fine_tune(model, dataset):
+    args = TrainingArguments(
+        output_dir="./informer-finetuned",
+        per_device_train_batch_size=16,
+        num_train_epochs=5,
+        learning_rate=5e-5,
+        weight_decay=0.01,
+        logging_steps=10,
+        save_strategy="epoch",
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=args,
+        train_dataset=dataset,
+        data_collator=collate_fn,
+        tokenizer=None,
+    )
+
+    trainer.train()
+    trainer.save_model("./informer-finetuned")
+
+
+# --------------------------
+# STEP 5: Prediction
+# --------------------------
+
+
+def predict(model, past_values, context_length=168, prediction_length=24):
+    model.eval()
+    with torch.no_grad():
+        inputs = {
+            "past_values": torch.tensor(
+                past_values[-context_length:], dtype=torch.float
+            )
+            .unsqueeze(0)
+            .unsqueeze(-1),
+            "past_observed_mask": torch.ones(1, context_length, 1),
+            "past_time_features": torch.zeros(1, context_length, 4),
+            "future_time_features": torch.zeros(1, prediction_length, 4),
+            "static_categorical_features": torch.zeros(1, 1, dtype=torch.long),
+            "static_real_features": torch.zeros(1, 1),
+        }
+        outputs = model(**inputs)
+        return outputs.predictions.squeeze().numpy()
+
 
 def informer_predict(informer_len_combinations, data):
     """
@@ -617,169 +592,63 @@ def informer_predict(informer_len_combinations, data):
     best_combination = None
     best_model = None
 
-    # Iterate over all seq_len and label_len combinations
     for seq_len, label_len in informer_len_combinations:
         train_len = len(data) - seq_len - target_len
         train_split = int(train_len * 0.8)
         train_data = data[:train_split]
         val_data = data[train_split:train_len]
-        
-        # Prepare datasets and loaders
-        train_dataset = TimeSeriesDataset(
-            train_data, seq_len, label_len, pred_len, target_len=1
-        )
-        val_dataset = TimeSeriesDataset(
-            val_data, seq_len, label_len, pred_len, target_len=1
-        )
-        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=False)
-        val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+
+        # Dataset using your defined UnivariateTimeSeriesDataset
+        train_dataset = UnivariateTimeSeriesDataset(train_data, context_length=seq_len)
+        val_dataset = UnivariateTimeSeriesDataset(val_data, context_length=seq_len)
 
         for lr in lr_lst:
-            # Model setup
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            print(f"Using device: {device}")
-            
-            # Initialize the Informer configuration
-            config = InformerConfig(
-                prediction_length=pred_len,
-                context_length=seq_len,
-                lags_sequence=[1, 2, 3, 4, 5, 6, 7],
-                input_size=pred_len,  # Default lags, adjust as needed
-                num_time_features=0,  # Adjust based on your features
-                # Optional parameters to match your original model
-                d_model=d_model,
-                num_encoder_layers=2,
-                num_decoder_layers=1,
-                encoder_attention_heads=8,
-                decoder_attention_heads=8,
-                encoder_ffn_dim=d_ff,
-                decoder_ffn_dim=d_ff,
-                dropout=dropout,
-                attention_dropout=dropout,
-                activation_function="gelu"
-            )
-            
-            # Load pretrained model (or initialize with config if not loading a specific pretrained model)
-            # If you want to use a specific pretrained model:
-            # model = InformerForPrediction.from_pretrained("huggingface/informer-model-name", config=config)
-            # Or initialize with configuration:
-            model = InformerForPrediction.from_pretrained("huggingface/informer-tourism-monthly",config=config)
-            model = model.to(device)
-            
-            # Training setup
-            criterion = torch.nn.MSELoss()
-            optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.001)
-            
-            val_loss, train_lst, val_lst = train_hf_informer(
-                model,
-                train_loader,
-                val_loader,
-                criterion,
-                optimizer,
-                epochs=500,
-                device=device,
-                checkpoint_path=checkpoint_path,
-            )
+            model = load_model().to(device)
 
-            # Update the best combination
+            # Fine-tune the model
+            fine_tune(model, train_dataset)
+
+            # Validation
+            model.eval()
+            val_loader = DataLoader(
+                val_dataset, batch_size=32, shuffle=False, collate_fn=collate_fn
+            )
+            criterion = torch.nn.MSELoss()
+            val_loss_total = 0
+            with torch.no_grad():
+                for batch in val_loader:
+                    batch = {k: v.to(device) for k, v in batch.items()}
+                    outputs = model(**batch)
+                    loss = criterion(outputs.predictions, batch["future_values"])
+                    val_loss_total += loss.item()
+            val_loss = val_loss_total / len(val_loader)
+
+            # Track the best
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 best_combination = (seq_len, label_len)
-                best_model = model  # Save model parameters
+                best_model = model
                 best_lr = lr
-                best_train_lst = train_lst
-                best_val_lst = val_lst
 
     print(
         f"Best Combination: seq_len: {best_combination[0]}, label_len: {best_combination[1]}, Val Loss: {best_val_loss:.4f}"
     )
 
-    # Find minimum losses
-    min_val_loss = min(best_val_lst)
-    min_train_loss = min(best_train_lst)
-
-    # Find epochs where minimum losses occur
-    min_val_epoch = best_val_lst.index(min_val_loss) + 1
-    min_train_epoch = best_train_lst.index(min_train_loss) + 1
-
-    # Plot training and validation loss
-    plt.figure(figsize=(10, 6))
-    plt.plot(
-        range(1, len(best_val_lst) + 1),
-        best_val_lst,
-        marker="o",
-        label="Validation Loss",
-        color="r",
-    )
-    plt.plot(
-        range(1, len(best_train_lst) + 1),
-        best_train_lst,
-        marker="s",
-        label="Training Loss",
-        color="b",
-    )
-
-    # Mark minimum points
-    plt.scatter(
-        min_val_epoch,
-        min_val_loss,
-        color="red",
-        s=100,
-        zorder=3,
-        label=f"Min Val Loss: {min_val_loss:.4f}",
-    )
-    plt.scatter(
-        min_train_epoch,
-        min_train_loss,
-        color="blue",
-        s=100,
-        zorder=3,
-        label=f"Min Train Loss: {min_train_loss:.4f}",
-    )
-
-    # Add text annotations to show the exact loss values
-    plt.text(
-        min_val_epoch,
-        min_val_loss,
-        f"{min_val_loss:.4f}",
-        fontsize=12,
-        verticalalignment="bottom",
-        horizontalalignment="right",
-        color="red",
-    )
-    plt.text(
-        min_train_epoch,
-        min_train_loss,
-        f"{min_train_loss:.4f}",
-        fontsize=12,
-        verticalalignment="top",
-        horizontalalignment="right",
-        color="blue",
-    )
-
-    # Labels and title
-    plt.title("Training and Validation Loss Over Epochs")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.legend()
-    plt.grid()
-
-    # Save the plot
-    plt.savefig(f"{plot_dir}/validation_loss_plot_{seed}.png")
-    plt.show()
-
-    # Perform iterative prediction using the best model
+    # Final prediction using best model
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     informer_predictions = iterative_prediction_with_update(
         best_model,
         data[len(data) - best_combination[0] - target_len :],
-        best_combination[0],
-        best_combination[1],
-        pred_len,
-        target_len,
-        device,
+        seq_len=best_combination[0],
+        label_len=best_combination[1],
+        pred_len=1,
+        target_len=1,
+        device=device,
     )
 
     return informer_predictions, best_combination, best_lr
+
 
 ################################### RNN ##################################
 # 定义滞后函数，生成滞后一阶和二阶的数据
@@ -1207,14 +1076,14 @@ if __name__ == "__main__":
     # ma = [1, 0.4]  # MA coefficients
     # informer setting
     pred_len = 1
-    d_model = 64  # 512
+    d_model = 32  # 512
     d_ff = 512  # 2048
     dropout = 0.2
     # mercury
-    # informer_len = [(10, 5), (20, 10), (50, 20)]  
+    # informer_len = [(10, 5), (20, 10), (50, 20)]
     # midway
     informer_len = [(10, 2), (20, 4), (50, 10)]
-    lr_lst = [1e-4, 1e-3, 1e-2]  
+    lr_lst = [1e-4, 1e-3, 1e-2]
     num = 1
     plot_dir = f"pretrained_val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
