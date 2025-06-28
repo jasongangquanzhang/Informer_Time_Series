@@ -434,7 +434,7 @@ def fine_tune_predict(data):
 
     if MODEL == "moirai":
         model = MoiraiForecast(
-            module=MoiraiModule.from_pretrained(f"Salesforce/moirai-1.1-R-{SIZE}"),
+            module=MoiraiModule.from_pretrained(f"Salesforce/moirai-1.1-R-{SIZE}",cache_dir="./hf_cache"),
             prediction_length=PDT,
             context_length=CTX,
             patch_size=PSZ,
@@ -445,11 +445,11 @@ def fine_tune_predict(data):
         )
     elif MODEL == "moirai-moe":
         model = MoiraiMoEForecast(
-            module=MoiraiMoEModule.from_pretrained(f"Salesforce/moirai-moe-1.0-R-{SIZE}"),
+            module=MoiraiMoEModule.from_pretrained(f"Salesforce/moirai-moe-1.0-R-{SIZE}",cache_dir="./hf_cache"),
             prediction_length=PDT,
             context_length=CTX,
             patch_size=16,
-            num_samples=1,
+            num_samples=100,
             target_dim=1,
             feat_dynamic_real_dim=ds.num_feat_dynamic_real,
             past_feat_dynamic_real_dim=ds.num_past_feat_dynamic_real,
@@ -471,7 +471,7 @@ def fine_tune_predict(data):
         # inp = next(input_it)
         # label = next(label_it)
         forecast = next(forecast_it)
-        forecast_result.append(forecast.samples[0][0])
+        forecast_result.append(forecast.median[0])
     return forecast_result
 
 
