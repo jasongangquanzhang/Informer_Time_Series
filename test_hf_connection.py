@@ -12,7 +12,7 @@ if __name__ == "__main__":
         else:
             print("❌ URL is not accessible.")
         print("Attempting to load Moirai model...")
-        model = MoiraiModule.from_pretrained("Salesforce/moirai-1.1-R-base")
+        model = MoiraiModule.from_pretrained("Salesforce/moirai-1.1-R-base",cache_dir="./hf_cache")
         print("✅ Moirai model loaded successfully!")
     except Exception as e:
         print("❌ Failed to load Moirai model:")
