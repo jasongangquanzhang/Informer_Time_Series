@@ -1,4 +1,6 @@
 import os
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -881,6 +883,7 @@ def main():
 
 
 if __name__ == "__main__":
+    os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
     parser = argparse.ArgumentParser(
         description="Train and evaluate Informer on synthetic time series with ARMA benchmark."
     )  #
@@ -912,10 +915,10 @@ if __name__ == "__main__":
     lr_lst = [1e-4, 1e-3, 1e-2]  
     
     num = 1
-    plot_dir = f"pretrained_val_plots_{num}"
+    plot_dir = f"TS_from_Pretrained/pretrained_val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
-    output_file = f"pretrained_csv_results/result_{num}.csv"
+    output_file = f"TS_from_Pretrained/pretrained_csv_results/result_{num}.csv"
 
     checkpoint_dir = "checkpoints/"
     os.makedirs(checkpoint_dir, exist_ok=True)
