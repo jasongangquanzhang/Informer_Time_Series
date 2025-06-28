@@ -438,7 +438,7 @@ def fine_tune_predict(data):
             prediction_length=PDT,
             context_length=CTX,
             patch_size=PSZ,
-            num_samples=1,
+            num_samples=100,
             target_dim=1,
             feat_dynamic_real_dim=ds.num_feat_dynamic_real,
             past_feat_dynamic_real_dim=ds.num_past_feat_dynamic_real,
