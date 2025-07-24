@@ -422,7 +422,7 @@ def fine_tune_predict(data):
     # Create a PandasDataset from the DataFrame
     ds = PandasDataset({"value": df["value"]})
 
-    MODEL = "moirai"  # model name: choose from {'moirai', 'moirai-moe'}
+    MODEL = "moirai-moe"  # model name: choose from {'moirai', 'moirai-moe'}
     SIZE = "base"  # model size: choose from {'small', 'base', 'large'}
     PDT = pred_len  # prediction length: any positive integer
     CTX = 20  # context length: any positive integer
@@ -437,7 +437,7 @@ def fine_tune_predict(data):
             module=MoiraiModule.from_pretrained(f"Salesforce/moirai-1.1-R-{SIZE}",cache_dir="./hf_cache"),
             prediction_length=PDT,
             context_length=CTX,
-            patch_size=PSZ,
+            patch_size=16,
             num_samples=100,
             target_dim=1,
             feat_dynamic_real_dim=ds.num_feat_dynamic_real,
@@ -445,7 +445,7 @@ def fine_tune_predict(data):
         )
     elif MODEL == "moirai-moe":
         model = MoiraiMoEForecast(
-            module=MoiraiMoEModule.from_pretrained(f"Salesforce/moirai-moe-1.0-R-{SIZE}",cache_dir="./hf_cache"),
+            module=MoiraiMoEModule.from_pretrained(f"Salesforce/moirai-moe-1.0-R-{SIZE}",cache_dir="./hf_MOE_cache"),
             prediction_length=PDT,
             context_length=CTX,
             patch_size=16,
@@ -914,7 +914,7 @@ if __name__ == "__main__":
     informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4, 1e-3, 1e-2]  
     
-    num = 1
+    num = 2
     plot_dir = f"TS_from_Pretrained/pretrained_val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
