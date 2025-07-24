@@ -2,15 +2,15 @@
 
 #SBATCH --account=pi-dachxiu
 #SBATCH --time=2:00:00
-#SBATCH --job-name=informer_TS
+#SBATCH --job-name=TSFM
 #SBATCH --partition=amd
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=10
-#SBATCH --array=1
+#SBATCH --array=1-100
 #SBATCH --mem-per-cpu=8000
 
 module load python/anaconda-2023.09
-source activate TSFT
+source activate olympus
 echo "Array ID: $SLURM_ARRAY_TASK_ID"
 
-srun /home/gangquanz/.conda/envs/TSFT/bin/python3.12 /home/gangquanz/Informer_Time_Series/test_hf_connection.py
+srun /home/gangquanz/.conda/envs/olympus/bin/python3.11 /home/gangquanz/Informer_Time_Series/test_hf_loading.py $SLURM_ARRAY_TASK_ID
