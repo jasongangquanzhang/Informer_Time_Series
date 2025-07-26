@@ -435,7 +435,7 @@ def TimesFM_forecast(data):
         inputs=[data[: -target_len]],
         freq=[0],                
         window_size=None,            
-        # forecast_context_len=forecast_context_len,
+        forecast_context_len=100,
         return_forecast_on_context=False,
         normalize=True,
     )
@@ -884,7 +884,7 @@ if __name__ == "__main__":
     informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4, 1e-3, 1e-2]  
     
-    num = 4
+    num = 5
     plot_dir = f"pretrained_val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
