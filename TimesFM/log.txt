@@ -28,3 +28,36 @@
     print(f"Forecasting at time: {forecast}")
 
     return np.array(forecast).tolist()  # final shape (500,)
+
+
+4
+def TimesFM_forecast(data):
+    tfm = timesfm.TimesFm(
+        hparams=timesfm.TimesFmHparams(
+            backend="cpu",
+            per_core_batch_size=32,
+            horizon_len=500,
+            num_layers=50,
+            use_positional_embedding=True,
+            context_len=2048,
+            point_forecast_mode='median'
+        ),
+        checkpoint=timesfm.TimesFmCheckpoint(
+            path="pretrained_models/torch_model.ckpt",
+            # huggingface_repo_id="google/timesfm-2.0-500m-pytorch"
+            ),
+    )
+    print("Using TimesFM for forecasting...")
+    
+    start = data_length - target_len
+    forecast, _ = tfm.forecast(
+        inputs=[data[: -target_len]],
+        freq=[0],                
+        window_size=None,            
+        # forecast_context_len=forecast_context_len,
+        return_forecast_on_context=False,
+        normalize=True,
+    )
+    print(f"Forecasting at time: {forecast}")
+
+    return np.array(forecast[0]).tolist()  # final shape (500,)
