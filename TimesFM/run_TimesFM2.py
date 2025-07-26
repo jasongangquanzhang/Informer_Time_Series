@@ -432,8 +432,8 @@ def TimesFM_forecast(data):
     
     start = data_length - target_len
     forecast, _ = tfm.forecast(
-        inputs=[data[: start]],
-        freq=[2],                
+        inputs=[data[: -target_len]],
+        freq=[0],                
         window_size=None,            
         # forecast_context_len=forecast_context_len,
         return_forecast_on_context=False,
@@ -441,7 +441,7 @@ def TimesFM_forecast(data):
     )
     print(f"Forecasting at time: {forecast}")
 
-    return np.array(forecast).tolist()  # final shape (500,)
+    return np.array(forecast[0]).tolist()  # final shape (500,)
 
 
 ###### Informer Module ######
@@ -884,7 +884,7 @@ if __name__ == "__main__":
     informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4, 1e-3, 1e-2]  
     
-    num = 1
+    num = 3
     plot_dir = f"pretrained_val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
