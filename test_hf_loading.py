@@ -15,16 +15,16 @@ def main():
         hparams=timesfm.TimesFmHparams(
             backend="cpu",
             per_core_batch_size=32,
-            horizon_len=1,
+            horizon_len=500,
             num_layers=50,
             use_positional_embedding=True,
             context_len=2048,
             point_forecast_mode='median'
         ),
         checkpoint=timesfm.TimesFmCheckpoint(
-            path="TimesFM/pretrained_models/torch_model.ckpt",
-            # huggingface_repo_id="google/timesfm-2.0-500m-pytorch",
-            # local_dir="TimesFM/pretrained_models",
+            # path="TimesFM/pretrained_models/torch_model.ckpt",
+            huggingface_repo_id="google/timesfm-2.0-500m-pytorch",
+            local_dir="TimesFM/pretrained_models",
         ),
     )
     forecast, _ = tfm.forecast(
