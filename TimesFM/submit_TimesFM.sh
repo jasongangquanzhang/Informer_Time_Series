@@ -13,4 +13,4 @@ module load python/anaconda-2023.09
 source activate olympus
 echo "Array ID: $SLURM_ARRAY_TASK_ID"
 
-srun /home/gangquanz/.conda/envs/olympus/bin/python3.11 /home/gangquanz/Informer_Time_Series/TimesFM/run_TimesFM2.py $SLURM_ARRAY_TASK_ID
+srun /home/gangquanz/.conda/envs/olympus/bin/python3.11 /home/gangquanz/Informer_Time_Series/TimesFM/run_TimesFM.py $SLURM_ARRAY_TASK_ID

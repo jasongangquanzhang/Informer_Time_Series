@@ -6,9 +6,9 @@ import torch.nn as nn
 import torch.optim as optim
 import random
 from torch.utils.data import DataLoader, Dataset
-from models.model import (
-    Informer,
-)  # Assuming Informer model is already defined and available
+# from models.model import (
+#     Informer,
+# )  # Assuming Informer model is already defined and available
 # from models.RNN import CustomReLUNet, CustomReLURNN
 from sklearn.metrics import mean_squared_error
 from statsmodels.tsa.arima_process import ArmaProcess
@@ -424,7 +424,7 @@ def TimesFM_forecast(data, forecast_context_len):
             point_forecast_mode='median'
         ),
         checkpoint=timesfm.TimesFmCheckpoint(
-            path="TimesFM/pretrained_models/torch_model.ckpt",
+            path="pretrained_models/torch_model.ckpt",
             # huggingface_repo_id="google/timesfm-2.0-500m-pytorch"
             ),
     )
