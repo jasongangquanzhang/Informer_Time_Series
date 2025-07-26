@@ -61,3 +61,14 @@ def TimesFM_forecast(data):
     print(f"Forecasting at time: {forecast}")
 
     return np.array(forecast[0]).tolist()  # final shape (500,)
+
+5
+start = data_length - target_len
+    forecast, _ = tfm.forecast(
+        inputs=[data[: -target_len]],
+        freq=[0],                
+        window_size=None,            
+        forecast_context_len=100,
+        return_forecast_on_context=False,
+        normalize=True,
+    )
