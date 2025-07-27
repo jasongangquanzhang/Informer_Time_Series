@@ -872,7 +872,7 @@ if __name__ == "__main__":
     seed = int(arg.integer)
     func_type = "arma"
     # Generate data
-    data_length = 1500
+    data_length = 1100
     target_len = 100
     # Parameters for ARMA(2,1) process
     # ar = [1, -0.5, 0.25]  # AR coefficients
