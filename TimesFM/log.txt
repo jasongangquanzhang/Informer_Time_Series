@@ -72,3 +72,82 @@ start = data_length - target_len
         return_forecast_on_context=False,
         normalize=True,
     )
+
+6
+def TimesFM_forecast(data, forecast_context_len):
+    tfm = timesfm.TimesFm(
+        hparams=timesfm.TimesFmHparams(
+            backend="cpu",
+            per_core_batch_size=32,
+            horizon_len=1,
+            num_layers=50,
+            use_positional_embedding=True,
+            context_len=2048,
+            point_forecast_mode='median'
+        ),
+        checkpoint=timesfm.TimesFmCheckpoint(
+            path="pretrained_models/torch_model.ckpt",
+            # huggingface_repo_id="google/timesfm-2.0-500m-pytorch"
+            ),
+    )
+    print("Using TimesFM for forecasting...")
+    
+
+    start = data_length - target_len
+    preds = []
+
+    # 3️⃣ Roll through the last 500 points, forecasting one step at a time
+    for t in range(start, data_length):
+        window = data[t - forecast_context_len : t]  
+        forecast, _ = tfm.forecast(
+            inputs=[window],
+            freq=[2],                
+            window_size=None,            
+            forecast_context_len=forecast_context_len,
+            return_forecast_on_context=False,
+            normalize=False,
+        )
+        print(f"Forecasting at time {t}: {forecast}")
+        preds.append(forecast[0, 0])
+
+    return np.array(preds).tolist()  # final shape (500,)
+
+
+7
+def TimesFM_forecast(data, forecast_context_len):
+    tfm = timesfm.TimesFm(
+        hparams=timesfm.TimesFmHparams(
+            backend="cpu",
+            per_core_batch_size=32,
+            horizon_len=1,
+            num_layers=50,
+            use_positional_embedding=True,
+            context_len=2048,
+            point_forecast_mode='median'
+        ),
+        checkpoint=timesfm.TimesFmCheckpoint(
+            path="pretrained_models/torch_model.ckpt",
+            # huggingface_repo_id="google/timesfm-2.0-500m-pytorch"
+            ),
+    )
+    print("Using TimesFM for forecasting...")
+    
+
+    start = data_length - target_len
+    preds = []
+
+    # 3️⃣ Roll through the last 500 points, forecasting one step at a time
+    for t in range(start, data_length):
+        window = data[t - forecast_context_len : t]  
+        forecast, _ = tfm.forecast(
+            inputs=[window],
+            freq=[0],                
+            window_size=None,            
+            forecast_context_len=forecast_context_len,
+            return_forecast_on_context=False,
+            normalize=True,
+        )
+        print(f"Forecasting at time {t}: {forecast}")
+        preds.append(forecast[0, 0])
+
+    return np.array(preds).tolist()  
