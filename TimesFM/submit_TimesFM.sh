@@ -8,6 +8,8 @@
 #SBATCH --cpus-per-task=10
 #SBATCH --array=1-100
 #SBATCH --mem-per-cpu=8000
+#SBATCH --mail-type=END
+#SBATCH --mail-user=gangquan.zhang@mail.utoronto.ca
 
 module load python/anaconda-2023.09
 source activate olympus
