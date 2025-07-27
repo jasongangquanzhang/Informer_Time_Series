@@ -131,7 +131,7 @@ forecast_context_len=100
         preds.append(forecast[0, 0])
 
 8
-forecast_context_len=1000
+forecast_context_len=500
 
     # 3️⃣ Roll through the last 500 points, forecasting one step at a time
     for t in range(start, data_length):
