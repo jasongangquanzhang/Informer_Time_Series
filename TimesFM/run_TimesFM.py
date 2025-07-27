@@ -855,7 +855,7 @@ def main():
     # result["Informer_lr"] = informer_lr
     
     ####### TimesFM ######
-    forecast_context_len=20
+    forecast_context_len=100
     result["TimesFM"] = TimesFM_forecast(data, forecast_context_len=forecast_context_len)
     return result
 
