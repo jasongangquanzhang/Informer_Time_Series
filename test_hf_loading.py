@@ -27,15 +27,15 @@ def main():
             local_dir="TimesFM/pretrained_models",
         ),
     )
-    forecast, _ = tfm.forecast(
-            inputs=[[1,2,3,4,5,6,7,8,9,10]],  # Example input
-            freq=[2],                    # high-frequency
-            window_size=None,            # no decomposition
-            forecast_context_len=10,
-            return_forecast_on_context=False,
-            normalize=False,
-        )
-    print(f"Forecast: {forecast}")
+    # forecast, _ = tfm.forecast(
+    #         inputs=[[1,2,3,4,5,6,7,8,9,10]],  # Example input
+    #         freq=[2],                    # high-frequency
+    #         window_size=None,            # no decomposition
+    #         forecast_context_len=10,
+    #         return_forecast_on_context=False,
+    #         normalize=False,
+    #     )
+    # print(f"Forecast: {forecast}")
 
 
 
