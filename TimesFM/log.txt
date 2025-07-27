@@ -146,3 +146,30 @@ forecast_context_len=500
         )
         print(f"Forecasting at time {t}: {forecast}")
         preds.append(forecast[0, 0])
+
+9
+forecast_context_len=1000
+
+    # 3️⃣ Roll through the last 500 points, forecasting one step at a time
+    for t in range(start, data_length):
+        window = data[t - forecast_context_len : t]  
+        forecast, _ = tfm.forecast(
+            inputs=[window],
+            freq=[0],                
+            window_size=None,            
+            forecast_context_len=forecast_context_len,
+            return_forecast_on_context=False,
+            normalize=True,
+        )
+        print(f"Forecasting at time {t}: {forecast}")
+        preds.append(forecast[0, 0])
+10
+hparams=timesfm.TimesFmHparams(
+            backend="cpu",
+            per_core_batch_size=32,
+            horizon_len=1,
+            num_layers=50,
+            use_positional_embedding=True,
+            context_len=2048,
+            point_forecast_mode='mean'
+        ),
