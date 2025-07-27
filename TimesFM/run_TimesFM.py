@@ -421,7 +421,7 @@ def TimesFM_forecast(data, forecast_context_len):
             num_layers=50,
             use_positional_embedding=True,
             context_len=2048,
-            point_forecast_mode='median'
+            point_forecast_mode='mean'
         ),
         checkpoint=timesfm.TimesFmCheckpoint(
             path="pretrained_models/torch_model.ckpt",
@@ -873,7 +873,7 @@ if __name__ == "__main__":
     func_type = "arma"
     # Generate data
     data_length = 1500
-    target_len = 500
+    target_len = 100
     # Parameters for ARMA(2,1) process
     # ar = [1, -0.5, 0.25]  # AR coefficients
     # ma = [1, 0.4]  # MA coefficients
@@ -892,7 +892,7 @@ if __name__ == "__main__":
     informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4, 1e-3, 1e-2]  
     
-    num = 9
+    num = 10
     plot_dir = f"pretrained_val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
