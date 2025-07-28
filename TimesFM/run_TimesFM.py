@@ -421,7 +421,7 @@ def TimesFM_forecast(data, forecast_context_len):
             num_layers=50,
             use_positional_embedding=True,
             context_len=2048,
-            point_forecast_mode='median'
+            point_forecast_mode='mean'
         ),
         checkpoint=timesfm.TimesFmCheckpoint(
             path="pretrained_models/torch_model.ckpt",
@@ -855,7 +855,7 @@ def main():
     # result["Informer_lr"] = informer_lr
     
     ####### TimesFM ######
-    forecast_context_len=500
+    forecast_context_len=900
     result["TimesFM"] = TimesFM_forecast(data, forecast_context_len=forecast_context_len)
     return result
 
@@ -892,7 +892,7 @@ if __name__ == "__main__":
     informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4, 1e-3, 1e-2]  
     
-    num = 9
+    num = 12
     plot_dir = f"pretrained_val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
