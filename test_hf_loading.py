@@ -14,12 +14,13 @@ def main():
     tfm = timesfm.TimesFm(
         hparams=timesfm.TimesFmHparams(
             backend="cpu",
-            per_core_batch_size=32,
-            horizon_len=500,
+            input_patch_len=32,
+            per_core_batch_size=64,
+            horizon_len=1,
             num_layers=50,
             use_positional_embedding=True,
-            context_len=2048,
-            point_forecast_mode='median'
+            context_len=1024,
+            point_forecast_mode='mean'
         ),
         checkpoint=timesfm.TimesFmCheckpoint(
             # path="TimesFM/pretrained_models/torch_model.ckpt",

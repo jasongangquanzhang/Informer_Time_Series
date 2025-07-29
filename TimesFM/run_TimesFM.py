@@ -1,11 +1,13 @@
 import os
 import warnings
+
 warnings.filterwarnings("ignore", category=FutureWarning)
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import random
 from torch.utils.data import DataLoader, Dataset
+
 # from models.model import (
 #     Informer,
 # )  # Assuming Informer model is already defined and available
@@ -411,6 +413,7 @@ def rolling_auto_arima(
 
     return forecasts, arima_model.order, train_mse, valid_mse
 
+
 ######## TimesFM ########
 def TimesFM_forecast(data, forecast_context_len):
     tfm = timesfm.TimesFm(
@@ -421,26 +424,25 @@ def TimesFM_forecast(data, forecast_context_len):
             num_layers=50,
             use_positional_embedding=True,
             context_len=2048,
-            point_forecast_mode='mean'
+            point_forecast_mode="mean",
         ),
         checkpoint=timesfm.TimesFmCheckpoint(
             path="pretrained_models/torch_model.ckpt",
             # huggingface_repo_id="google/timesfm-2.0-500m-pytorch"
-            ),
+        ),
     )
     print("Using TimesFM for forecasting...")
-    
 
     start = data_length - target_len
     preds = []
 
     # 3️⃣ Roll through the last 500 points, forecasting one step at a time
     for t in range(start, data_length):
-        window = data[t - forecast_context_len : t]  
+        window = data[t - forecast_context_len : t]
         forecast, _ = tfm.forecast(
             inputs=[window],
-            freq=[0],                
-            window_size=None,            
+            freq=[0],
+            window_size=None,
             forecast_context_len=forecast_context_len,
             return_forecast_on_context=False,
             normalize=True,
@@ -564,7 +566,6 @@ def train(
     epochs,
     device,
     checkpoint_path="checkpoint.pth",
-
 ):
     """
     Train the model and return the final validation loss.
@@ -594,7 +595,6 @@ def train(
             # Make the prediction using the model
             y_pred = model(enc_in, enc_in, dec_in, dec_in)
 
-
             loss = criterion(y_pred, target)
             loss.backward()
             optimizer.step()
@@ -615,7 +615,6 @@ def train(
 
                 enc_in = enc_input
                 dec_in = dec_input
-
 
                 # Set the last point of decoder input to 0 (masking the last point as before)
                 dec_in[:, -1, :] = 0  # Mask the last bit of decoder input
@@ -818,6 +817,7 @@ def informer_predict(informer_len_combinations, data):
 
     return informer_predictions, best_combination, best_lr
 
+
 # Main function
 def main():
     print("Setting seed for reproducibility...")
@@ -853,9 +853,42 @@ def main():
     # result["Informer"] = informer_pred
     # result["Informer_para"] = informer_para
     # result["Informer_lr"] = informer_lr
-    
+
     ####### TimesFM ######
-    forecast_context_len_lst = [50,128,256,512,768,982]
+    forecast_context_len_lst = [
+        32,
+        64,
+        96,
+        128,
+        160,
+        192,
+        224,
+        256,
+        288,
+        320,
+        352,
+        384,
+        416,
+        448,
+        480,
+        512,
+        544,
+        576,
+        608,
+        640,
+        672,
+        704,
+        736,
+        768,
+        800,
+        832,
+        864,
+        896,
+        928,
+        960,
+        992,
+    ]
+    # forecast_context_len_lst = [256]
     for forecast_context_len in forecast_context_len_lst:
         print(f"Using forecast context length: {forecast_context_len}")
         result[f"TimesFM_{forecast_context_len}"] = TimesFM_forecast(
@@ -886,17 +919,16 @@ if __name__ == "__main__":
     d_model = 64  # 512
     d_ff = 512  # 2048
     dropout = 0.2
-    
-    
+
     #############Pretrained Model Settings#############
-    
+
     # mercury
-    # informer_len = [(10, 5), (20, 10), (50, 20)]  
+    # informer_len = [(10, 5), (20, 10), (50, 20)]
     # midway
     informer_len = [(10, 2), (20, 4), (50, 10)]
-    lr_lst = [1e-4, 1e-3, 1e-2]  
-    
-    num = 13
+    lr_lst = [1e-4, 1e-3, 1e-2]
+
+    num = 14
     plot_dir = f"pretrained_val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 

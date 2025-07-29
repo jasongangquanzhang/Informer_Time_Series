@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --account=pi-dachxiu
-#SBATCH --time=0-12:00:00
-#SBATCH --job-name=informer_TS
+#SBATCH --time=1-12:00:00
+#SBATCH --job-name=TimesFm
 #SBATCH --partition=amd
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=10
