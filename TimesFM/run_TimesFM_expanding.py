@@ -412,7 +412,7 @@ def rolling_auto_arima(
     return forecasts, arima_model.order, train_mse, valid_mse
 
 ######## TimesFM ########
-def TimesFM_forecast(data, forecast_context_len):
+def TimesFM_forecast(data):
     tfm = timesfm.TimesFm(
         hparams=timesfm.TimesFmHparams(
             backend="cpu",
@@ -436,12 +436,11 @@ def TimesFM_forecast(data, forecast_context_len):
 
     # 3️⃣ Roll through the last 500 points, forecasting one step at a time
     for t in range(start, data_length):
-        window = data[t - forecast_context_len : t]  
+        window = data[: t]  
         forecast, _ = tfm.forecast(
             inputs=[window],
             freq=[0],                
             window_size=None,            
-            forecast_context_len=forecast_context_len,
             return_forecast_on_context=False,
             normalize=True,
         )
@@ -855,12 +854,7 @@ def main():
     # result["Informer_lr"] = informer_lr
     
     ####### TimesFM ######
-    forecast_context_len_lst = [50,128,256,512,768,982]
-    for forecast_context_len in forecast_context_len_lst:
-        print(f"Using forecast context length: {forecast_context_len}")
-        result[f"TimesFM_{forecast_context_len}"] = TimesFM_forecast(
-            data, forecast_context_len=forecast_context_len
-        )
+    result[f"TimesFM_expanding"] = TimesFM_forecast(data)
     return result
 
 
@@ -896,7 +890,7 @@ if __name__ == "__main__":
     informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4, 1e-3, 1e-2]  
     
-    num = 13
+    num = "expanding"
     plot_dir = f"pretrained_val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 

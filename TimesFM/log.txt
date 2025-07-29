@@ -241,3 +241,10 @@ def TimesFM_forecast(data, forecast_context_len=500):
 
     return np.array(preds).tolist()  # final shape (500,)
 
+13
+forecast_context_len_lst = [50,128,256,512,768,982]
+for forecast_context_len in forecast_context_len_lst:
+    print(f"Using forecast context length: {forecast_context_len}")
+    result[f"TimesFM_{forecast_context_len}"] = TimesFM_forecast(
+        data, forecast_context_len=forecast_context_len
+    )
