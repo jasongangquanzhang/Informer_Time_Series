@@ -888,7 +888,7 @@ def main():
         960,
         992,
     ]
-    # forecast_context_len_lst = [256]
+    forecast_context_len_lst = [672]
     for forecast_context_len in forecast_context_len_lst:
         print(f"Using forecast context length: {forecast_context_len}")
         result[f"TimesFM_{forecast_context_len}"] = TimesFM_forecast(
@@ -928,7 +928,7 @@ if __name__ == "__main__":
     informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4, 1e-3, 1e-2]
 
-    num = 14
+    num = 15
     plot_dir = f"pretrained_val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
