@@ -423,7 +423,7 @@ def TimesFM_forecast(data, forecast_context_len):
             horizon_len=1,
             num_layers=50,
             use_positional_embedding=True,
-            context_len=2048,
+            context_len=1024,
             point_forecast_mode="mean",
         ),
         checkpoint=timesfm.TimesFmCheckpoint(
@@ -441,7 +441,7 @@ def TimesFM_forecast(data, forecast_context_len):
         window = data[t - forecast_context_len : t]
         forecast, _ = tfm.forecast(
             inputs=[window],
-            freq=[0],
+            freq=[2],
             window_size=None,
             forecast_context_len=forecast_context_len,
             return_forecast_on_context=False,
@@ -928,7 +928,7 @@ if __name__ == "__main__":
     informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4, 1e-3, 1e-2]
 
-    num = 15
+    num = 16
     plot_dir = f"pretrained_val_plots_{num}"
     os.makedirs(plot_dir, exist_ok=True)
 
