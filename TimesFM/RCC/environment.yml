@@ -213,4 +213,4 @@ dependencies:
       - utilsforecast==0.2.12
       - wandb==0.21.0
       - wcwidth==0.2.13
-prefix: /home/gangquanz/.conda/envs/olympus
+prefix: /home/zshen10/miniconda3/envs/olympus
