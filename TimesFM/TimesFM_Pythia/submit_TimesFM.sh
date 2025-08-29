@@ -4,7 +4,7 @@
 #SBATCH --partition=standard_h100
 #SBATCH --cpus-per-task=1         
 #SBATCH --mem=10G       
-#SBATCH --time=0-04:00:00   
+#SBATCH --time=0-12:00:00   
 #SBATCH --gres=gpu:1
 #SBATCH --job-name=timesfm
 #SBATCH --array=1-100

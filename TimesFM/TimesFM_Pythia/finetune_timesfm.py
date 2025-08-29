@@ -553,7 +553,7 @@ def TimesFM_forecast(data, forecast_context_len):
             ))
 
     model = tfm._model
-    config = FinetuningConfig(batch_size=128,
+    config = FinetuningConfig(batch_size=64,
                                 num_epochs=5,
                                 learning_rate=1e-4,
                                 use_wandb=False,
@@ -638,34 +638,34 @@ def main():
         96,
         128,
         160,
-        192,
-        224,
-        256,
-        288,
-        320,
-        352,
-        384,
-        416,
-        448,
-        480,
-        512,
-        544,
-        576,
-        608,
-        640,
-        672,
-        704,
-        736,
-        768,
-        800,
-        832,
-        864,
-        896,
-        928,
-        960,
-        992,
+        # 192,
+        # 224,
+        # 256,
+        # 288,
+        # 320,
+        # 352,
+        # 384,
+        # 416,
+        # 448,
+        # 480,
+        # 512,
+        # 544,
+        # 576,
+        # 608,
+        # 640,
+        # 672,
+        # 704,
+        # 736,
+        # 768,
+        # 800,
+        # 832,
+        # 864,
+        # 896,
+        # 928,
+        # 960,
+        # 992,
     ]
-    forecast_context_len_lst = [128]
+    # forecast_context_len_lst = [128]
     for forecast_context_len in forecast_context_len_lst:
         print(f"Using forecast context length: {forecast_context_len}")
         result[f"TimesFM_{forecast_context_len}"] = TimesFM_forecast(
@@ -705,7 +705,7 @@ if __name__ == "__main__":
     informer_len = [(10, 2), (20, 4), (50, 10)]
     lr_lst = [1e-4, 1e-3, 1e-2]
 
-    num = 1
+    num = 2
     # plot_dir = f"finetuned_val_plots_{num}"
     # os.makedirs(plot_dir, exist_ok=True)
 
